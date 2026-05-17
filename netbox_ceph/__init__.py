@@ -11,7 +11,7 @@ class CephConfig(PluginConfig):
     name = "netbox_ceph"
     verbose_name = "NetBox Ceph"
     description = "Read-only Ceph inventory via netbox-proxbox and proxbox-api"
-    version = "0.0.1"
+    version = "0.0.1rc1"
     author = "N-MultiCloud"
     base_url = "ceph"
     min_version = "4.5.8"
