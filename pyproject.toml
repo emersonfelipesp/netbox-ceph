@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["netbox_ceph*"]
+
+[project]
+name = "netbox-ceph"
+version = "0.0.1"
+description = "NetBox plugin for read-only Ceph inventory through netbox-proxbox / proxbox-api"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [
+    {name = "Emerson Felipe", email = "emersonfelipe.2003@gmail.com"},
+]
+dependencies = [
+    "netbox-proxbox>=0.0.16",
+    "requests>=2.33.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
+    "ghp-import>=2.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/emersonfelipesp/netbox-ceph"
+Documentation = "https://emersonfelipesp.github.io/netbox-ceph/"
+Source = "https://github.com/emersonfelipesp/netbox-ceph"
+Issues = "https://github.com/emersonfelipesp/netbox-ceph/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.coverage.run]
+branch = true
+source = ["netbox_ceph"]
+omit = [
+    "netbox_ceph/migrations/*",
+    "**/__pycache__/*",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = ["netbox_ceph/migrations"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "W", "C90"]
+ignore = ["F401", "F403", "E501"]
