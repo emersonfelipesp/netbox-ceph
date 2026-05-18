@@ -10,7 +10,6 @@ from django.shortcuts import redirect
 from django.views import View
 from netbox.views import generic
 from utilities.views import (
-    ConditionalLoginRequiredMixin,
     ContentTypePermissionRequiredMixin,
     ViewTab,
     register_model_view,
@@ -30,7 +29,7 @@ from netbox_ceph.models import (
 )
 
 
-class CephHomeView(ConditionalLoginRequiredMixin, generic.ObjectListView):
+class CephHomeView(generic.ObjectListView):
     """Plugin home landing redirects to the cluster list for v1."""
 
     queryset = CephCluster.objects.all()
@@ -57,7 +56,6 @@ class CephPluginSettingsEditView(generic.ObjectEditView):
 
 
 class SettingsSingletonRedirectView(
-    ConditionalLoginRequiredMixin,
     ContentTypePermissionRequiredMixin,
     View,
 ):

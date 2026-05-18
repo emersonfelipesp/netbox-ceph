@@ -37,17 +37,15 @@ class CephPluginSettingsForm(NetBoxModelForm):
 
 
 class _EndpointFilterMixin:
-    endpoint = DynamicModelChoiceField(
-        queryset=None,  # lazy below
-        required=False,
-        label=_("Proxmox endpoint"),
-    )
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from netbox_proxbox.models import ProxmoxEndpoint  # noqa: PLC0415
 
-        self.fields["endpoint"].queryset = ProxmoxEndpoint.objects.all()
+        self.fields["endpoint"] = DynamicModelChoiceField(
+            queryset=ProxmoxEndpoint.objects.all(),
+            required=False,
+            label=_("Proxmox endpoint"),
+        )
 
 
 class CephClusterFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
