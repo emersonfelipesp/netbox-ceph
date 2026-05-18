@@ -8,6 +8,7 @@ import pytest
 
 
 def test_package_importable() -> None:
+    pytest.importorskip("netbox")
     module = importlib.import_module("netbox_ceph")
     assert module is not None
 

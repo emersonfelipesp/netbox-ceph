@@ -7,7 +7,7 @@ include = ["netbox_ceph*"]
 
 [project]
 name = "netbox-ceph"
-version = "0.0.1rc2"
+version = "0.0.1rc3"
 description = "NetBox plugin for read-only Ceph inventory through netbox-proxbox / proxbox-api"
 readme = "README.md"
 requires-python = ">=3.12"
