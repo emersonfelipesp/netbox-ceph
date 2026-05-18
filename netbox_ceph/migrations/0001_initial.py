@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("extras", "0002_squashed_0059"),
         ("netbox_proxbox", "0001_initial"),
+        ("netbox_proxbox", "0038_v0_0_16_release"),
     ]
 
     operations = [
