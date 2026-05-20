@@ -19,5 +19,9 @@ class CephConfig(PluginConfig):
     required_plugins = ["netbox_proxbox"]
     queues: list[str] = []
 
+    def ready(self) -> None:
+        super().ready()
+        from . import jobs  # noqa: F401 — registers CephSyncJob via JobRunner metaclass
+
 
 config = CephConfig
