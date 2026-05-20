@@ -6,6 +6,7 @@ from django.urls import include, path
 from utilities.urls import get_model_urls
 
 from netbox_ceph import views
+from netbox_ceph.sitemap import SitemapView
 
 app_name = "netbox_ceph"
 
@@ -23,6 +24,7 @@ _MODEL_ROUTES = (
 
 urlpatterns = [
     path("", views.CephHomeView.as_view(), name="home"),
+    path("sitemap.txt", SitemapView.as_view(), name="sitemap"),
     path(
         "settings/edit/",
         views.settings_singleton_redirect,
