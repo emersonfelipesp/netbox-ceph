@@ -29,7 +29,6 @@ LIST_PAGES: list[tuple[str, str]] = [
     ("crush-rules-list", "/plugins/ceph/crush-rules/"),
     ("flags-list", "/plugins/ceph/flags/"),
     ("health-checks-list", "/plugins/ceph/health-checks/"),
-    ("settings-list", "/plugins/ceph/settings/"),
 ]
 
 
