@@ -64,12 +64,6 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
             ("health-checks-list", "/plugins/ceph/health-checks/"),
         ],
     ),
-    (
-        "Settings",
-        [
-            ("settings-list", "/plugins/ceph/settings/"),
-        ],
-    ),
 ]
 
 # Detail pages that require a {pk} — excluded from the static sitemap.
