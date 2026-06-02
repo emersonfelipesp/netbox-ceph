@@ -60,7 +60,13 @@ nav:
   - Installation: installation.md
   - Models: models.md
   - Sync Jobs: sync.md
+  - Ceph v2:
+      - Overview: v2/overview.md
+      - Providers: v2/providers.md
+      - Plan And Apply: v2/plan-apply.md
+      - Operations And Audit: v2/operations.md
   - Certification: certification.md
   - Release Notes:
       - Summary: release-notes/index.md
+      - Ceph v2 Foundation: release-notes/ceph-v2-foundation.md
       - Version 0.0.1.post1: release-notes/version-0.0.1.post1.md

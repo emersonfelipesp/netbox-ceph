@@ -18,5 +18,12 @@ router.register("filesystems", views.CephFilesystemViewSet)
 router.register("crush-rules", views.CephCrushRuleViewSet)
 router.register("flags", views.CephFlagViewSet)
 router.register("health-checks", views.CephHealthCheckViewSet)
+router.register("providers", views.CephProviderViewSet)
+router.register("operations", views.CephOperationViewSet)
+router.register("plans", views.CephPlanViewSet)
+router.register("validation-results", views.CephValidationResultViewSet)
+router.register("operation-runs", views.CephOperationRunViewSet)
+router.register("drift-records", views.CephDriftRecordViewSet)
+router.register("metric-snapshots", views.CephMetricSnapshotViewSet)
 
 urlpatterns = router.urls

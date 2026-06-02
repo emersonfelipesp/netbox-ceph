@@ -6,8 +6,10 @@ All inventory models are exposed as read-only object/list views in v1. Only
 
 from __future__ import annotations
 
+from django.db.models import Count
 from django.shortcuts import redirect
 from django.views import View
+from django.views.generic import TemplateView
 from netbox.views import generic
 from utilities.views import (
     ContentTypePermissionRequiredMixin,
@@ -16,16 +18,24 @@ from utilities.views import (
 )
 
 from netbox_ceph import filtersets, forms, tables
+from netbox_ceph.choices import CephDriftStatusChoices
 from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
     CephDaemon,
+    CephDriftRecord,
     CephFilesystem,
     CephFlag,
     CephHealthCheck,
+    CephMetricSnapshot,
+    CephOperation,
+    CephOperationRun,
     CephOSD,
+    CephPlan,
     CephPluginSettings,
     CephPool,
+    CephProvider,
+    CephValidationResult,
 )
 
 
@@ -37,6 +47,41 @@ class CephHomeView(generic.ObjectListView):
     filterset = filtersets.CephClusterFilterSet
     filterset_form = forms.CephClusterFilterForm
     template_name = "netbox_ceph/home.html"
+
+
+class CephV2DashboardView(ContentTypePermissionRequiredMixin, TemplateView):
+    """Ceph v2 dashboard aggregates rendered from NetBox state only."""
+
+    template_name = "netbox_ceph/ceph_v2_dashboard.html"
+
+    def get_required_permission(self) -> str:
+        return "netbox_ceph.view_cephcluster"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "cluster_health": CephCluster.objects.values("health")
+                .annotate(count=Count("pk"))
+                .order_by("health"),
+                "provider_status": CephProvider.objects.values("status")
+                .annotate(count=Count("pk"))
+                .order_by("status"),
+                "recent_operations": CephOperation.objects.select_related(
+                    "cluster",
+                    "provider",
+                    "requested_by",
+                ).order_by("-created", "-pk")[:10],
+                "drift_count": CephDriftRecord.objects.exclude(
+                    drift_status=CephDriftStatusChoices.STATUS_IN_SYNC
+                ).count(),
+                "latest_metric_snapshots": CephMetricSnapshot.objects.select_related(
+                    "cluster",
+                    "provider",
+                ).order_by("-captured_at", "-created", "-pk")[:10],
+            }
+        )
+        return context
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +203,34 @@ def _register_readonly(model, table_cls, fs_cls, form_cls):
         actions = {}
 
 
+def _register_writable(model, table_cls, fs_cls, filter_form_cls, model_form_cls):
+    @register_model_view(model)
+    class _View(generic.ObjectView):  # noqa: D401
+        queryset = model.objects.all()
+
+    @register_model_view(model, "list", path="", detail=False)
+    class _ListView(generic.ObjectListView):  # noqa: D401
+        queryset = model.objects.all()
+        table = table_cls
+        filterset = fs_cls
+        filterset_form = filter_form_cls
+
+    # Register the same edit view under both ``add`` (list path) and ``edit``
+    # (detail path), mirroring NetBox core. The ``add`` registration is what
+    # creates the ``<model>_add`` URL name referenced by the navigation
+    # buttons; without it, reversing the nav link raises ``NoReverseMatch``
+    # and 500s every page that renders the sidebar.
+    @register_model_view(model, "add", detail=False)
+    @register_model_view(model, "edit")
+    class _EditView(generic.ObjectEditView):  # noqa: D401
+        queryset = model.objects.all()
+        form = model_form_cls
+
+    @register_model_view(model, "delete")
+    class _DeleteView(generic.ObjectDeleteView):  # noqa: D401
+        queryset = model.objects.all()
+
+
 _register_readonly(
     CephDaemon, tables.CephDaemonTable, filtersets.CephDaemonFilterSet, forms.CephDaemonFilterForm
 )
@@ -187,4 +260,51 @@ _register_readonly(
     tables.CephHealthCheckTable,
     filtersets.CephHealthCheckFilterSet,
     forms.CephHealthCheckFilterForm,
+)
+_register_writable(
+    CephProvider,
+    tables.CephProviderTable,
+    filtersets.CephProviderFilterSet,
+    forms.CephProviderFilterForm,
+    forms.CephProviderForm,
+)
+_register_writable(
+    CephOperation,
+    tables.CephOperationTable,
+    filtersets.CephOperationFilterSet,
+    forms.CephOperationFilterForm,
+    forms.CephOperationForm,
+)
+_register_writable(
+    CephPlan,
+    tables.CephPlanTable,
+    filtersets.CephPlanFilterSet,
+    forms.CephPlanFilterForm,
+    forms.CephPlanForm,
+)
+_register_writable(
+    CephValidationResult,
+    tables.CephValidationResultTable,
+    filtersets.CephValidationResultFilterSet,
+    forms.CephValidationResultFilterForm,
+    forms.CephValidationResultForm,
+)
+_register_writable(
+    CephOperationRun,
+    tables.CephOperationRunTable,
+    filtersets.CephOperationRunFilterSet,
+    forms.CephOperationRunFilterForm,
+    forms.CephOperationRunForm,
+)
+_register_readonly(
+    CephDriftRecord,
+    tables.CephDriftRecordTable,
+    filtersets.CephDriftRecordFilterSet,
+    forms.CephDriftRecordFilterForm,
+)
+_register_readonly(
+    CephMetricSnapshot,
+    tables.CephMetricSnapshotTable,
+    filtersets.CephMetricSnapshotFilterSet,
+    forms.CephMetricSnapshotFilterForm,
 )

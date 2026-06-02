@@ -11,6 +11,13 @@ and job conventions. This post release normalizes certification evidence,
 packaging metadata, and compatibility documentation without changing runtime
 behavior.
 
+Ceph v2 adds the NetBox desired-state and operations foundation alongside the
+read-only v1 inventory: provider references, operation requests, generated
+plans, validation findings, apply-run audit records, drift records, metric
+snapshots, and a feature-detecting proxbox-api orchestrator client. Resource
+configuration for pools, CephFS, RGW, and RBD remains out of scope for this
+foundation.
+
 ## Included Models
 
 - Ceph clusters

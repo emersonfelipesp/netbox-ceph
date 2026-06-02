@@ -11,15 +11,31 @@ from netbox_ceph.models.ceph import (
     CephPluginSettings,
     CephPool,
 )
+from netbox_ceph.models.metrics import CephMetricSnapshot
+from netbox_ceph.models.operations import (
+    CephDriftRecord,
+    CephOperation,
+    CephOperationRun,
+    CephPlan,
+    CephValidationResult,
+)
+from netbox_ceph.models.providers import CephProvider
 
 __all__ = [
     "CephCluster",
     "CephCrushRule",
     "CephDaemon",
+    "CephDriftRecord",
     "CephFilesystem",
     "CephFlag",
     "CephHealthCheck",
+    "CephMetricSnapshot",
     "CephOSD",
+    "CephOperation",
+    "CephOperationRun",
+    "CephPlan",
     "CephPluginSettings",
     "CephPool",
+    "CephProvider",
+    "CephValidationResult",
 ]
