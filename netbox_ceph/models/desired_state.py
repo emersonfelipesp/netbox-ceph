@@ -295,3 +295,221 @@ class CephRBDSnapshotDesiredState(NetBoxModel):
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ceph:cephrbdsnapshotdesiredstate", args=[self.pk])
+
+
+class CephRGWRealmDesiredState(NetBoxModel):
+    """NetBox-defined desired configuration for an RGW realm."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_realm_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rgw_realm_desired_states",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    enabled = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+    )
+
+    class Meta:
+        ordering = ("cluster", "name")
+        verbose_name = _("Ceph RGW realm (desired state)")
+        verbose_name_plural = _("Ceph RGW realms (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("cluster", "name"),
+                name="netbox_ceph_rgw_realm_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwrealmdesiredstate", args=[self.pk])
+
+
+class CephRGWZoneDesiredState(NetBoxModel):
+    """NetBox-defined desired configuration for an RGW zone."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_zone_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rgw_zone_desired_states",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    enabled = models.BooleanField(default=True)
+    realm = models.ForeignKey(
+        to="netbox_ceph.CephRGWRealmDesiredState",
+        on_delete=models.SET_NULL,
+        related_name="zones",
+        null=True,
+        blank=True,
+    )
+    zonegroup_name = models.CharField(max_length=255, blank=True)
+    is_master = models.BooleanField(default=False)
+    endpoints = models.JSONField(
+        blank=True,
+        default=list,
+        encoder=CustomFieldJSONEncoder,
+    )
+    placement_targets = models.JSONField(
+        blank=True,
+        default=list,
+        encoder=CustomFieldJSONEncoder,
+    )
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+    )
+
+    class Meta:
+        ordering = ("cluster", "name")
+        verbose_name = _("Ceph RGW zone (desired state)")
+        verbose_name_plural = _("Ceph RGW zones (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("cluster", "name"),
+                name="netbox_ceph_rgw_zone_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwzonedesiredstate", args=[self.pk])
+
+
+class CephRGWUserDesiredState(NetBoxModel):
+    """NetBox-defined desired configuration for an RGW/S3 user."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_user_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rgw_user_desired_states",
+        null=True,
+        blank=True,
+    )
+    uid = models.CharField(max_length=255)
+    enabled = models.BooleanField(default=True)
+    display_name = models.CharField(max_length=255, blank=True)
+    email = models.CharField(max_length=255, blank=True)
+    tenant_name = models.CharField(max_length=255, blank=True)
+    suspended = models.BooleanField(default=False)
+    max_buckets = models.IntegerField(null=True, blank=True)
+    quota_max_size_bytes = models.BigIntegerField(null=True, blank=True)
+    quota_max_objects = models.BigIntegerField(null=True, blank=True)
+    credential_ref = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "Opaque pointer to the user's S3 keys in proxbox-api; NetBox never stores the keys."
+        ),
+    )
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+    )
+
+    class Meta:
+        ordering = ("cluster", "uid")
+        verbose_name = _("Ceph RGW user (desired state)")
+        verbose_name_plural = _("Ceph RGW users (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("cluster", "uid"),
+                name="netbox_ceph_rgw_user_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.uid} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwuserdesiredstate", args=[self.pk])
+
+
+class CephRGWBucketDesiredState(NetBoxModel):
+    """NetBox-defined desired configuration for an RGW/S3 bucket."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_bucket_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rgw_bucket_desired_states",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    enabled = models.BooleanField(default=True)
+    owner = models.ForeignKey(
+        to="netbox_ceph.CephRGWUserDesiredState",
+        on_delete=models.SET_NULL,
+        related_name="buckets",
+        null=True,
+        blank=True,
+    )
+    placement_target = models.CharField(max_length=255, blank=True)
+    versioning_enabled = models.BooleanField(default=False)
+    quota_max_size_bytes = models.BigIntegerField(null=True, blank=True)
+    quota_max_objects = models.BigIntegerField(null=True, blank=True)
+    lifecycle_policy = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+    )
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+    )
+
+    class Meta:
+        ordering = ("cluster", "name")
+        verbose_name = _("Ceph RGW bucket (desired state)")
+        verbose_name_plural = _("Ceph RGW buckets (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("cluster", "name"),
+                name="netbox_ceph_rgw_bucket_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwbucketdesiredstate", args=[self.pk])

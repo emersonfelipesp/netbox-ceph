@@ -35,6 +35,10 @@ from netbox_ceph.models import (  # noqa: E402
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -111,6 +115,10 @@ def test_desired_state_identity_constraints_are_named() -> None:
         CephFilesystemDesiredState: "netbox_ceph_filesystem_desired_identity",
         CephRBDImageDesiredState: "netbox_ceph_rbd_image_desired_identity",
         CephRBDSnapshotDesiredState: "netbox_ceph_rbd_snapshot_desired_identity",
+        CephRGWRealmDesiredState: "netbox_ceph_rgw_realm_desired_identity",
+        CephRGWZoneDesiredState: "netbox_ceph_rgw_zone_desired_identity",
+        CephRGWUserDesiredState: "netbox_ceph_rgw_user_desired_identity",
+        CephRGWBucketDesiredState: "netbox_ceph_rgw_bucket_desired_identity",
     }
     for model, constraint_name in constraints.items():
         assert constraint_name in {c.name for c in model._meta.constraints}
@@ -123,6 +131,10 @@ def test_desired_state_identity_constraints_are_named() -> None:
         (CephFilesystemDesiredState, "cephfilesystemdesiredstate"),
         (CephRBDImageDesiredState, "cephrbdimagedesiredstate"),
         (CephRBDSnapshotDesiredState, "cephrbdsnapshotdesiredstate"),
+        (CephRGWRealmDesiredState, "cephrgwrealmdesiredstate"),
+        (CephRGWZoneDesiredState, "cephrgwzonedesiredstate"),
+        (CephRGWUserDesiredState, "cephrgwuserdesiredstate"),
+        (CephRGWBucketDesiredState, "cephrgwbucketdesiredstate"),
     ],
 )
 def test_desired_state_models_reverse_absolute_urls(model, route_name: str) -> None:
@@ -137,6 +149,10 @@ def test_desired_state_models_reverse_absolute_urls(model, route_name: str) -> N
         "cephfilesystemdesiredstate",
         "cephrbdimagedesiredstate",
         "cephrbdsnapshotdesiredstate",
+        "cephrgwrealmdesiredstate",
+        "cephrgwzonedesiredstate",
+        "cephrgwuserdesiredstate",
+        "cephrgwbucketdesiredstate",
     ],
 )
 def test_desired_state_writable_crud_urls_registered(route_name: str) -> None:
@@ -183,9 +199,65 @@ def test_desired_state_serializer_fields_are_present() -> None:
             "protected",
             "parameters",
         },
+        serializers.CephRGWRealmDesiredStateSerializer: {
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "is_default",
+            "parameters",
+        },
+        serializers.CephRGWZoneDesiredStateSerializer: {
+            "cluster",
+            "provider",
+            "name",
+            "realm",
+            "zonegroup_name",
+            "is_master",
+            "endpoints",
+            "placement_targets",
+            "parameters",
+        },
+        serializers.CephRGWUserDesiredStateSerializer: {
+            "cluster",
+            "provider",
+            "uid",
+            "display_name",
+            "email",
+            "tenant_name",
+            "suspended",
+            "max_buckets",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "credential_ref",
+            "parameters",
+        },
+        serializers.CephRGWBucketDesiredStateSerializer: {
+            "cluster",
+            "provider",
+            "name",
+            "owner",
+            "placement_target",
+            "versioning_enabled",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "lifecycle_policy",
+            "parameters",
+        },
     }
     for serializer_cls, fields in expected.items():
         assert fields.issubset(set(serializer_cls.Meta.fields))
+
+
+def test_rgw_desired_state_serializers_do_not_expose_secret_fields() -> None:
+    forbidden = {"access_key", "secret_key", "password", "token"}
+    for serializer_cls in (
+        serializers.CephRGWRealmDesiredStateSerializer,
+        serializers.CephRGWZoneDesiredStateSerializer,
+        serializers.CephRGWUserDesiredStateSerializer,
+        serializers.CephRGWBucketDesiredStateSerializer,
+    ):
+        assert forbidden.isdisjoint(set(serializer_cls.Meta.fields))
 
 
 def test_desired_state_viewsets_allow_writes() -> None:
@@ -194,6 +266,10 @@ def test_desired_state_viewsets_allow_writes() -> None:
         views.CephFilesystemDesiredStateViewSet,
         views.CephRBDImageDesiredStateViewSet,
         views.CephRBDSnapshotDesiredStateViewSet,
+        views.CephRGWRealmDesiredStateViewSet,
+        views.CephRGWZoneDesiredStateViewSet,
+        views.CephRGWUserDesiredStateViewSet,
+        views.CephRGWBucketDesiredStateViewSet,
     ):
         # No read-only restriction: POST/PATCH/DELETE must be permitted.
         methods = getattr(viewset_cls, "http_method_names", None)

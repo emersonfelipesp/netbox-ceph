@@ -93,6 +93,22 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
                 "rbd-snapshot-desired-states-list",
                 "/plugins/ceph/rbd-snapshot-desired-states/",
             ),
+            (
+                "rgw-realm-desired-states-list",
+                "/plugins/ceph/rgw-realm-desired-states/",
+            ),
+            (
+                "rgw-zone-desired-states-list",
+                "/plugins/ceph/rgw-zone-desired-states/",
+            ),
+            (
+                "rgw-user-desired-states-list",
+                "/plugins/ceph/rgw-user-desired-states/",
+            ),
+            (
+                "rgw-bucket-desired-states-list",
+                "/plugins/ceph/rgw-bucket-desired-states/",
+            ),
         ],
     ),
 ]
@@ -115,6 +131,10 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 # /plugins/ceph/operation-runs/{pk}/
 # /plugins/ceph/drift-records/{pk}/
 # /plugins/ceph/metric-snapshots/{pk}/
+# /plugins/ceph/rgw-realm-desired-states/{pk}/
+# /plugins/ceph/rgw-zone-desired-states/{pk}/
+# /plugins/ceph/rgw-user-desired-states/{pk}/
+# /plugins/ceph/rgw-bucket-desired-states/{pk}/
 
 
 def _build_sitemap(base: str) -> list[str]:

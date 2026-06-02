@@ -29,5 +29,9 @@ router.register("pool-desired-states", views.CephPoolDesiredStateViewSet)
 router.register("filesystem-desired-states", views.CephFilesystemDesiredStateViewSet)
 router.register("rbd-image-desired-states", views.CephRBDImageDesiredStateViewSet)
 router.register("rbd-snapshot-desired-states", views.CephRBDSnapshotDesiredStateViewSet)
+router.register("rgw-realm-desired-states", views.CephRGWRealmDesiredStateViewSet)
+router.register("rgw-zone-desired-states", views.CephRGWZoneDesiredStateViewSet)
+router.register("rgw-user-desired-states", views.CephRGWUserDesiredStateViewSet)
+router.register("rgw-bucket-desired-states", views.CephRGWBucketDesiredStateViewSet)
 
 urlpatterns = router.urls

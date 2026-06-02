@@ -28,6 +28,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -267,3 +271,62 @@ class CephRBDSnapshotDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilte
     class Meta:
         model = CephRBDSnapshotDesiredState
         fields = ("id", "cluster", "provider", "image", "name", "enabled", "protected")
+
+
+class CephRGWRealmDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    class Meta:
+        model = CephRGWRealmDesiredState
+        fields = ("id", "cluster", "provider", "name", "enabled", "is_default")
+
+
+class CephRGWZoneDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "realm__name", "zonegroup_name")
+
+    class Meta:
+        model = CephRGWZoneDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "realm",
+            "name",
+            "enabled",
+            "zonegroup_name",
+            "is_master",
+        )
+
+
+class CephRGWUserDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("uid", "display_name", "email", "tenant_name")
+
+    class Meta:
+        model = CephRGWUserDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "uid",
+            "enabled",
+            "display_name",
+            "email",
+            "tenant_name",
+            "suspended",
+            "max_buckets",
+        )
+
+
+class CephRGWBucketDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "owner__uid", "placement_target")
+
+    class Meta:
+        model = CephRGWBucketDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "owner",
+            "name",
+            "enabled",
+            "placement_target",
+            "versioning_enabled",
+        )

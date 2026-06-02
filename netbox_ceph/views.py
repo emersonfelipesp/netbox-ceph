@@ -39,6 +39,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -343,4 +347,32 @@ _register_writable(
     filtersets.CephRBDSnapshotDesiredStateFilterSet,
     forms.CephRBDSnapshotDesiredStateFilterForm,
     forms.CephRBDSnapshotDesiredStateForm,
+)
+_register_writable(
+    CephRGWRealmDesiredState,
+    tables.CephRGWRealmDesiredStateTable,
+    filtersets.CephRGWRealmDesiredStateFilterSet,
+    forms.CephRGWRealmDesiredStateFilterForm,
+    forms.CephRGWRealmDesiredStateForm,
+)
+_register_writable(
+    CephRGWZoneDesiredState,
+    tables.CephRGWZoneDesiredStateTable,
+    filtersets.CephRGWZoneDesiredStateFilterSet,
+    forms.CephRGWZoneDesiredStateFilterForm,
+    forms.CephRGWZoneDesiredStateForm,
+)
+_register_writable(
+    CephRGWUserDesiredState,
+    tables.CephRGWUserDesiredStateTable,
+    filtersets.CephRGWUserDesiredStateFilterSet,
+    forms.CephRGWUserDesiredStateFilterForm,
+    forms.CephRGWUserDesiredStateForm,
+)
+_register_writable(
+    CephRGWBucketDesiredState,
+    tables.CephRGWBucketDesiredStateTable,
+    filtersets.CephRGWBucketDesiredStateFilterSet,
+    forms.CephRGWBucketDesiredStateFilterForm,
+    forms.CephRGWBucketDesiredStateForm,
 )

@@ -40,6 +40,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 from netbox_ceph.services.http_client import CephBackendError
@@ -463,3 +467,31 @@ class CephRBDSnapshotDesiredStateViewSet(NetBoxModelViewSet):
     ).all()
     serializer_class = serializers.CephRBDSnapshotDesiredStateSerializer
     filterset_class = filtersets.CephRBDSnapshotDesiredStateFilterSet
+
+
+class CephRGWRealmDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRGWRealmDesiredState.objects.select_related("cluster", "provider").all()
+    serializer_class = serializers.CephRGWRealmDesiredStateSerializer
+    filterset_class = filtersets.CephRGWRealmDesiredStateFilterSet
+
+
+class CephRGWZoneDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRGWZoneDesiredState.objects.select_related(
+        "cluster", "provider", "realm"
+    ).all()
+    serializer_class = serializers.CephRGWZoneDesiredStateSerializer
+    filterset_class = filtersets.CephRGWZoneDesiredStateFilterSet
+
+
+class CephRGWUserDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRGWUserDesiredState.objects.select_related("cluster", "provider").all()
+    serializer_class = serializers.CephRGWUserDesiredStateSerializer
+    filterset_class = filtersets.CephRGWUserDesiredStateFilterSet
+
+
+class CephRGWBucketDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRGWBucketDesiredState.objects.select_related(
+        "cluster", "provider", "owner"
+    ).all()
+    serializer_class = serializers.CephRGWBucketDesiredStateSerializer
+    filterset_class = filtersets.CephRGWBucketDesiredStateFilterSet
