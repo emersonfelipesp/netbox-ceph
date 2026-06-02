@@ -1,0 +1,28 @@
+name: Deploy to production (netbox.nmulti.cloud)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (tag or branch, default: main)'
+        required: false
+        default: 'main'
+
+jobs:
+  deploy:
+    name: Deploy plugin
+    runs-on: prod-deploy
+    env:
+      REF: ${{ inputs.ref || github.sha }}
+    steps:
+      - name: Deploy plugin
+        run: |
+          # Validate ref format defensively (accepts tags, branches, and commit shas)
+          case "$REF" in
+            v[0-9]*.[0-9]*.[0-9]* | main | develop | [a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*) ;;
+            *) echo "ERROR: Invalid ref format: $REF"; exit 1 ;;
+          esac
+          ssh -o StrictHostKeyChecking=accept-new               -o ServerAliveInterval=30               -o ServerAliveCountMax=20               nmc-prod-207 -- deploy-plugin ceph "$REF"

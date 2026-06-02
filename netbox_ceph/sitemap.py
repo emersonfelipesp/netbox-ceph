@@ -13,6 +13,7 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
         "Home",
         [
             ("home", "/plugins/ceph/"),
+            ("ceph-v2-dashboard", "/plugins/ceph/v2/"),
             ("sitemap", "/plugins/ceph/sitemap.txt"),
         ],
     ),
@@ -64,6 +65,28 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
             ("health-checks-list", "/plugins/ceph/health-checks/"),
         ],
     ),
+    (
+        "Ceph v2",
+        [
+            ("providers-list", "/plugins/ceph/providers/"),
+            ("operations-list", "/plugins/ceph/operations/"),
+            ("plans-list", "/plugins/ceph/plans/"),
+            ("validation-results-list", "/plugins/ceph/validation-results/"),
+            ("operation-runs-list", "/plugins/ceph/operation-runs/"),
+            ("drift-records-list", "/plugins/ceph/drift-records/"),
+            ("metric-snapshots-list", "/plugins/ceph/metric-snapshots/"),
+        ],
+    ),
+    (
+        "Desired State",
+        [
+            ("pool-desired-states-list", "/plugins/ceph/pool-desired-states/"),
+            (
+                "filesystem-desired-states-list",
+                "/plugins/ceph/filesystem-desired-states/",
+            ),
+        ],
+    ),
 ]
 
 # Detail pages that require a {pk} — excluded from the static sitemap.
@@ -77,6 +100,13 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 # /plugins/ceph/health-checks/{pk}/
 # /plugins/ceph/settings/{pk}/
 # /plugins/ceph/settings/{pk}/edit/
+# /plugins/ceph/providers/{pk}/
+# /plugins/ceph/operations/{pk}/
+# /plugins/ceph/plans/{pk}/
+# /plugins/ceph/validation-results/{pk}/
+# /plugins/ceph/operation-runs/{pk}/
+# /plugins/ceph/drift-records/{pk}/
+# /plugins/ceph/metric-snapshots/{pk}/
 
 
 def _build_sitemap(base: str) -> list[str]:

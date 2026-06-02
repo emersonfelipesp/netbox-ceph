@@ -10,11 +10,20 @@ from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
     CephDaemon,
+    CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
+    CephMetricSnapshot,
+    CephOperation,
+    CephOperationRun,
     CephOSD,
+    CephPlan,
     CephPool,
+    CephPoolDesiredState,
+    CephProvider,
+    CephValidationResult,
 )
 
 
@@ -249,3 +258,291 @@ class CephHealthCheckTable(NetBoxTable):
             "actions",
         )
         default_columns = ("name", "endpoint", "cluster", "severity", "summary", "last_seen_at")
+
+
+class CephProviderTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    is_default = BooleanColumn()
+    verify_ssl = BooleanColumn(verbose_name="Verify SSL")
+
+    class Meta(NetBoxTable.Meta):
+        model = CephProvider
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "kind",
+            "enabled",
+            "is_default",
+            "base_url",
+            "verify_ssl",
+            "credential_ref",
+            "status",
+            "status_detail",
+            "last_checked_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "kind",
+            "enabled",
+            "is_default",
+            "status",
+            "last_checked_at",
+        )
+
+
+class CephOperationTable(NetBoxTable):
+    target_kind = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    is_destructive = BooleanColumn()
+    confirmation_required = BooleanColumn()
+    confirmed = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephOperation
+        fields = (
+            "pk",
+            "id",
+            "cluster",
+            "provider",
+            "operation_type",
+            "target_kind",
+            "target_ref",
+            "status",
+            "is_destructive",
+            "confirmation_required",
+            "confirmed",
+            "requested_by",
+            "source_branch_schema_id",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "operation_type",
+            "target_kind",
+            "target_ref",
+            "cluster",
+            "provider",
+            "status",
+            "is_destructive",
+            "confirmed",
+            "created",
+        )
+
+
+class CephPlanTable(NetBoxTable):
+    operation = tables.Column(linkify=True)
+    is_destructive = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephPlan
+        fields = (
+            "pk",
+            "id",
+            "operation",
+            "status",
+            "summary",
+            "provider_target",
+            "is_destructive",
+            "generated_at",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "operation",
+            "status",
+            "provider_target",
+            "is_destructive",
+            "generated_at",
+        )
+
+
+class CephValidationResultTable(NetBoxTable):
+    code = tables.Column(linkify=True)
+    plan = tables.Column(linkify=True)
+    operation = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephValidationResult
+        fields = (
+            "pk",
+            "id",
+            "plan",
+            "operation",
+            "severity",
+            "code",
+            "message",
+            "target",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = ("severity", "code", "message", "target", "operation")
+
+
+class CephOperationRunTable(NetBoxTable):
+    operation = tables.Column(linkify=True)
+    plan = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephOperationRun
+        fields = (
+            "pk",
+            "id",
+            "operation",
+            "plan",
+            "provider",
+            "status",
+            "actor",
+            "source_branch_schema_id",
+            "provider_task_ref",
+            "started_at",
+            "finished_at",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "operation",
+            "provider",
+            "status",
+            "provider_task_ref",
+            "started_at",
+            "finished_at",
+        )
+
+
+class CephDriftRecordTable(NetBoxTable):
+    object_ref = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephDriftRecord
+        fields = (
+            "pk",
+            "id",
+            "cluster",
+            "provider",
+            "object_kind",
+            "object_ref",
+            "drift_status",
+            "detected_at",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "object_kind",
+            "object_ref",
+            "cluster",
+            "provider",
+            "drift_status",
+            "detected_at",
+        )
+
+
+class CephMetricSnapshotTable(NetBoxTable):
+    object_ref = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephMetricSnapshot
+        fields = (
+            "pk",
+            "id",
+            "cluster",
+            "provider",
+            "scope",
+            "object_ref",
+            "source",
+            "captured_at",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "scope",
+            "object_ref",
+            "cluster",
+            "provider",
+            "source",
+            "captured_at",
+        )
+
+
+class CephPoolDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephPoolDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "enabled",
+            "size",
+            "min_size",
+            "pg_autoscale_mode",
+            "application",
+            "crush_rule_name",
+            "compression_mode",
+            "erasure_code_profile",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "enabled",
+            "size",
+            "min_size",
+            "application",
+            "pg_autoscale_mode",
+        )
+
+
+class CephFilesystemDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    metadata_pool = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephFilesystemDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "enabled",
+            "metadata_pool",
+            "mds_placement",
+            "standby_count",
+            "max_mds",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "enabled",
+            "metadata_pool",
+            "standby_count",
+            "max_mds",
+        )

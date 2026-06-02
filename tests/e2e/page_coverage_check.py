@@ -20,6 +20,7 @@ _NETBOX_API_TOKEN = os.environ.get("NETBOX_API_TOKEN", "")
 
 LIST_PAGES: list[tuple[str, str]] = [
     ("home", "/plugins/ceph/"),
+    ("ceph-v2-dashboard", "/plugins/ceph/v2/"),
     ("sitemap", "/plugins/ceph/sitemap.txt"),
     ("clusters-list", "/plugins/ceph/clusters/"),
     ("daemons-list", "/plugins/ceph/daemons/"),
@@ -29,6 +30,15 @@ LIST_PAGES: list[tuple[str, str]] = [
     ("crush-rules-list", "/plugins/ceph/crush-rules/"),
     ("flags-list", "/plugins/ceph/flags/"),
     ("health-checks-list", "/plugins/ceph/health-checks/"),
+    ("providers-list", "/plugins/ceph/providers/"),
+    ("operations-list", "/plugins/ceph/operations/"),
+    ("plans-list", "/plugins/ceph/plans/"),
+    ("validation-results-list", "/plugins/ceph/validation-results/"),
+    ("operation-runs-list", "/plugins/ceph/operation-runs/"),
+    ("drift-records-list", "/plugins/ceph/drift-records/"),
+    ("metric-snapshots-list", "/plugins/ceph/metric-snapshots/"),
+    ("pool-desired-states-list", "/plugins/ceph/pool-desired-states/"),
+    ("filesystem-desired-states-list", "/plugins/ceph/filesystem-desired-states/"),
 ]
 
 

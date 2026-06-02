@@ -13,11 +13,20 @@ from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
     CephDaemon,
+    CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
+    CephMetricSnapshot,
+    CephOperation,
+    CephOperationRun,
     CephOSD,
+    CephPlan,
     CephPool,
+    CephPoolDesiredState,
+    CephProvider,
+    CephValidationResult,
 )
 
 
@@ -28,6 +37,20 @@ class _EndpointSearchMixin:
         if not value:
             return queryset
         return queryset.filter(Q(name__icontains=value) | Q(endpoint__name__icontains=value))
+
+
+class _ClusterSearchMixin:
+    """Shared free-text search across v2 object refs and cluster name."""
+
+    search_fields: tuple[str, ...] = ("name",)
+
+    def search(self, queryset, name, value):
+        if not value:
+            return queryset
+        query = Q(cluster__name__icontains=value)
+        for field in self.search_fields:
+            query |= Q(**{f"{field}__icontains": value})
+        return queryset.filter(query)
 
 
 class CephClusterFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
@@ -101,3 +124,120 @@ class CephHealthCheckFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
     class Meta:
         model = CephHealthCheck
         fields = ("id", "endpoint", "cluster", "name", "severity", "source")
+
+
+class CephProviderFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    class Meta:
+        model = CephProvider
+        fields = ("id", "cluster", "kind", "name", "enabled", "is_default", "status")
+
+
+class CephOperationFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("target_kind", "target_ref", "source_branch_schema_id")
+
+    class Meta:
+        model = CephOperation
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "operation_type",
+            "target_kind",
+            "target_ref",
+            "status",
+            "is_destructive",
+            "confirmation_required",
+            "confirmed",
+            "requested_by",
+            "confirmed_by",
+            "source_branch_schema_id",
+        )
+
+
+class CephPlanFilterSet(NetBoxModelFilterSet):
+    class Meta:
+        model = CephPlan
+        fields = ("id", "operation", "status", "provider_target", "is_destructive")
+
+    def search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(summary__icontains=value) | Q(provider_target__icontains=value)
+        )
+
+
+class CephValidationResultFilterSet(NetBoxModelFilterSet):
+    class Meta:
+        model = CephValidationResult
+        fields = ("id", "plan", "operation", "severity", "code", "target")
+
+    def search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(code__icontains=value) | Q(message__icontains=value) | Q(target__icontains=value)
+        )
+
+
+class CephOperationRunFilterSet(NetBoxModelFilterSet):
+    class Meta:
+        model = CephOperationRun
+        fields = (
+            "id",
+            "operation",
+            "plan",
+            "provider",
+            "status",
+            "actor",
+            "source_branch_schema_id",
+            "provider_task_ref",
+        )
+
+    def search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(provider_task_ref__icontains=value) | Q(source_branch_schema_id__icontains=value)
+        )
+
+
+class CephDriftRecordFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("object_kind", "object_ref")
+
+    class Meta:
+        model = CephDriftRecord
+        fields = ("id", "cluster", "provider", "object_kind", "object_ref", "drift_status")
+
+
+class CephMetricSnapshotFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("object_ref", "source")
+
+    class Meta:
+        model = CephMetricSnapshot
+        fields = ("id", "cluster", "provider", "scope", "object_ref", "source")
+
+
+class CephPoolDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "crush_rule_name")
+
+    class Meta:
+        model = CephPoolDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "application",
+            "pg_autoscale_mode",
+            "compression_mode",
+        )
+
+
+class CephFilesystemDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "mds_placement")
+
+    class Meta:
+        model = CephFilesystemDesiredState
+        fields = ("id", "cluster", "provider", "name", "enabled", "metadata_pool")
