@@ -122,17 +122,27 @@ models are the NetBox-first, operator-editable source of intent:
   `CephPoolDesiredState`), `data_pools` (JSON list), `mds_placement`,
   `standby_count`, `max_mds`, `quota_max_bytes`, and `parameters`. Unique per
   (`cluster`, `name`) via `netbox_ceph_filesystem_desired_identity`.
+- `CephRBDImageDesiredState` — desired RBD image config: `pool_name`, `name`,
+  `size_bytes`, `features`, layout (`object_size`, `stripe_unit`,
+  `stripe_count`), optional EC `data_pool`, clone parent image/snapshot,
+  `metadata`, and `parameters`. Unique per (`cluster`, `pool_name`, `name`) via
+  `netbox_ceph_rbd_image_desired_identity`.
+- `CephRBDSnapshotDesiredState` — desired RBD snapshot intent: parent `image`,
+  `name`, `protected`, and `parameters`. Unique per (`image`, `name`) via
+  `netbox_ceph_rbd_snapshot_desired_identity`.
 
-Both models are writable NetBox objects (full CRUD UI + REST). An operator edits
-desired state, then a `CephOperation` (with `target_kind=pool`/`cephfs`)
-references it to produce a `CephPlan` preview and, after validation, a
-`CephOperationRun` apply attempt through the orchestrator. Desired-state objects
-hold no secrets — provider credentials remain `credential_ref` pointers only.
+These models are writable NetBox objects (full CRUD UI + REST). An operator
+edits desired state, then a `CephOperation` references it to produce a
+`CephPlan` preview and, after validation, a `CephOperationRun` apply attempt
+through the orchestrator. Desired-state objects hold no secrets — provider
+credentials remain `credential_ref` pointers only.
 
 REST endpoints: `/api/plugins/ceph/pool-desired-states/` and
-`/api/plugins/ceph/filesystem-desired-states/`. UI lives under the **Desired
-State** navigation group. See `docs/v2/desired-state.md` for the full field
-reference and reconciliation flow.
+`/api/plugins/ceph/filesystem-desired-states/`,
+`/api/plugins/ceph/rbd-image-desired-states/`, and
+`/api/plugins/ceph/rbd-snapshot-desired-states/`. UI lives under the
+**Desired State** navigation group. See `docs/v2/desired-state.md` for the full
+field reference and reconciliation flow.
 
 ## Secret-Ref Rule
 

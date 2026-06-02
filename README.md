@@ -17,11 +17,13 @@ plans, validation findings, apply-run audit records, drift records, metric
 snapshots, and a feature-detecting proxbox-api orchestrator client.
 
 Desired-state configuration objects (`CephPoolDesiredState`,
-`CephFilesystemDesiredState`) let operators declare NetBox-first pool and CephFS
-intent — size, autoscale, CRUSH rule, application, quotas, compression, CephFS
-metadata/data pools, and MDS placement — which a `CephOperation` references to
-produce a plan and, after validation, an apply run through the orchestrator.
-RGW/S3 and RBD desired-state remain out of scope for this milestone.
+`CephFilesystemDesiredState`, `CephRBDImageDesiredState`, and
+`CephRBDSnapshotDesiredState`) let operators declare NetBox-first pool, CephFS,
+and RBD intent — size, autoscale, CRUSH rule, application, quotas, compression,
+CephFS metadata/data pools, MDS placement, RBD image layout/features, and RBD
+snapshot protection — which a `CephOperation` references to produce a plan and,
+after validation, an apply run through the orchestrator. RGW/S3 desired-state
+remains out of scope for this milestone.
 
 ## Included Models
 
@@ -36,6 +38,8 @@ RGW/S3 and RBD desired-state remain out of scope for this milestone.
 - Ceph plugin settings
 - Ceph pool desired state (v2)
 - Ceph filesystem desired state (v2)
+- Ceph RBD image desired state (v2)
+- Ceph RBD snapshot desired state (v2)
 
 ## Compatibility
 

@@ -27,5 +27,7 @@ router.register("drift-records", views.CephDriftRecordViewSet)
 router.register("metric-snapshots", views.CephMetricSnapshotViewSet)
 router.register("pool-desired-states", views.CephPoolDesiredStateViewSet)
 router.register("filesystem-desired-states", views.CephFilesystemDesiredStateViewSet)
+router.register("rbd-image-desired-states", views.CephRBDImageDesiredStateViewSet)
+router.register("rbd-snapshot-desired-states", views.CephRBDSnapshotDesiredStateViewSet)
 
 urlpatterns = router.urls

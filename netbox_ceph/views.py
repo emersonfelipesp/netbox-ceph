@@ -37,6 +37,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -327,4 +329,18 @@ _register_writable(
     filtersets.CephFilesystemDesiredStateFilterSet,
     forms.CephFilesystemDesiredStateFilterForm,
     forms.CephFilesystemDesiredStateForm,
+)
+_register_writable(
+    CephRBDImageDesiredState,
+    tables.CephRBDImageDesiredStateTable,
+    filtersets.CephRBDImageDesiredStateFilterSet,
+    forms.CephRBDImageDesiredStateFilterForm,
+    forms.CephRBDImageDesiredStateForm,
+)
+_register_writable(
+    CephRBDSnapshotDesiredState,
+    tables.CephRBDSnapshotDesiredStateTable,
+    filtersets.CephRBDSnapshotDesiredStateFilterSet,
+    forms.CephRBDSnapshotDesiredStateFilterForm,
+    forms.CephRBDSnapshotDesiredStateForm,
 )

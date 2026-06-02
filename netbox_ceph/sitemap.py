@@ -85,6 +85,14 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
                 "filesystem-desired-states-list",
                 "/plugins/ceph/filesystem-desired-states/",
             ),
+            (
+                "rbd-image-desired-states-list",
+                "/plugins/ceph/rbd-image-desired-states/",
+            ),
+            (
+                "rbd-snapshot-desired-states-list",
+                "/plugins/ceph/rbd-snapshot-desired-states/",
+            ),
         ],
     ),
 ]

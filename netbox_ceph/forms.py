@@ -30,6 +30,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -321,6 +323,44 @@ class CephFilesystemDesiredStateForm(NetBoxModelForm):
         )
 
 
+class CephRBDImageDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRBDImageDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "pool_name",
+            "name",
+            "enabled",
+            "size_bytes",
+            "features",
+            "object_size",
+            "stripe_unit",
+            "stripe_count",
+            "data_pool",
+            "clone_parent_image",
+            "clone_parent_snapshot",
+            "metadata",
+            "parameters",
+            "tags",
+        )
+
+
+class CephRBDSnapshotDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRBDSnapshotDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "image",
+            "name",
+            "enabled",
+            "protected",
+            "parameters",
+            "tags",
+        )
+
+
 class CephPoolDesiredStateFilterForm(NetBoxModelFilterSetForm):
     model = CephPoolDesiredState
     cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
@@ -337,3 +377,24 @@ class CephFilesystemDesiredStateFilterForm(NetBoxModelFilterSetForm):
     provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
     name = forms.CharField(required=False)
     enabled = forms.NullBooleanField(required=False)
+
+
+class CephRBDImageDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRBDImageDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    pool_name = forms.CharField(required=False)
+    name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+
+
+class CephRBDSnapshotDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRBDSnapshotDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    image = DynamicModelChoiceField(
+        queryset=CephRBDImageDesiredState.objects.all(), required=False
+    )
+    name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+    protected = forms.NullBooleanField(required=False)

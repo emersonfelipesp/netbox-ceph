@@ -165,3 +165,133 @@ class CephFilesystemDesiredState(NetBoxModel):
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ceph:cephfilesystemdesiredstate", args=[self.pk])
+
+
+class CephRBDImageDesiredState(NetBoxModel):
+    """NetBox-defined desired configuration for an RBD image."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rbd_image_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rbd_image_desired_states",
+        null=True,
+        blank=True,
+    )
+    pool_name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    enabled = models.BooleanField(
+        default=True,
+        help_text=_("Whether this desired state is active for reconciliation."),
+    )
+    size_bytes = models.BigIntegerField(null=True, blank=True)
+    features = models.JSONField(
+        blank=True,
+        default=list,
+        encoder=CustomFieldJSONEncoder,
+        help_text=_(
+            "RBD feature flags, e.g. layering, exclusive-lock, object-map, fast-diff, "
+            "deep-flatten, journaling."
+        ),
+    )
+    object_size = models.PositiveIntegerField(null=True, blank=True)
+    stripe_unit = models.PositiveIntegerField(null=True, blank=True)
+    stripe_count = models.PositiveIntegerField(null=True, blank=True)
+    data_pool = models.CharField(max_length=255, blank=True)
+    clone_parent_image = models.ForeignKey(
+        to="self",
+        on_delete=models.SET_NULL,
+        related_name="clone_children",
+        null=True,
+        blank=True,
+    )
+    clone_parent_snapshot = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+        help_text=_("Image rbd-meta key/value pairs."),
+    )
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+        help_text=_("Additional provider-specific image parameters."),
+    )
+
+    class Meta:
+        ordering = ("cluster", "pool_name", "name")
+        verbose_name = _("Ceph RBD image (desired state)")
+        verbose_name_plural = _("Ceph RBD images (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("cluster", "pool_name", "name"),
+                name="netbox_ceph_rbd_image_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrbdimagedesiredstate", args=[self.pk])
+
+
+class CephRBDSnapshotDesiredState(NetBoxModel):
+    """NetBox-defined desired intent for an RBD snapshot."""
+
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rbd_snapshot_desired_states",
+        verbose_name=_("Ceph cluster"),
+    )
+    provider = models.ForeignKey(
+        to="netbox_ceph.CephProvider",
+        on_delete=models.SET_NULL,
+        related_name="rbd_snapshot_desired_states",
+        null=True,
+        blank=True,
+    )
+    image = models.ForeignKey(
+        to="netbox_ceph.CephRBDImageDesiredState",
+        on_delete=models.CASCADE,
+        related_name="snapshots",
+    )
+    name = models.CharField(max_length=255)
+    enabled = models.BooleanField(
+        default=True,
+        help_text=_("Whether this desired state is active for reconciliation."),
+    )
+    protected = models.BooleanField(
+        default=False,
+        help_text=_("Whether the snapshot should be protected (required before cloning)."),
+    )
+    parameters = models.JSONField(
+        blank=True,
+        default=dict,
+        encoder=CustomFieldJSONEncoder,
+        help_text=_("Additional provider-specific snapshot parameters."),
+    )
+
+    class Meta:
+        ordering = ("image", "name")
+        verbose_name = _("Ceph RBD snapshot (desired state)")
+        verbose_name_plural = _("Ceph RBD snapshots (desired state)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("image", "name"),
+                name="netbox_ceph_rbd_snapshot_desired_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (desired)"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrbdsnapshotdesiredstate", args=[self.pk])

@@ -26,6 +26,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -241,3 +243,27 @@ class CephFilesystemDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilter
     class Meta:
         model = CephFilesystemDesiredState
         fields = ("id", "cluster", "provider", "name", "enabled", "metadata_pool")
+
+
+class CephRBDImageDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "pool_name", "data_pool")
+
+    class Meta:
+        model = CephRBDImageDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "pool_name",
+            "name",
+            "enabled",
+            "clone_parent_image",
+        )
+
+
+class CephRBDSnapshotDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "image__name")
+
+    class Meta:
+        model = CephRBDSnapshotDesiredState
+        fields = ("id", "cluster", "provider", "image", "name", "enabled", "protected")
