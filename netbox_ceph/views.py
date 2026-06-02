@@ -215,6 +215,12 @@ def _register_writable(model, table_cls, fs_cls, filter_form_cls, model_form_cls
         filterset = fs_cls
         filterset_form = filter_form_cls
 
+    # Register the same edit view under both ``add`` (list path) and ``edit``
+    # (detail path), mirroring NetBox core. The ``add`` registration is what
+    # creates the ``<model>_add`` URL name referenced by the navigation
+    # buttons; without it, reversing the nav link raises ``NoReverseMatch``
+    # and 500s every page that renders the sidebar.
+    @register_model_view(model, "add", detail=False)
     @register_model_view(model, "edit")
     class _EditView(generic.ObjectEditView):  # noqa: D401
         queryset = model.objects.all()

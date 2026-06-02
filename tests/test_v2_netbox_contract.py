@@ -101,6 +101,32 @@ def test_apply_action_rejects_unplanned_operation_before_backend_call() -> None:
     assert "planned" in response.data["detail"]
 
 
+def test_navigation_links_and_buttons_all_reverse() -> None:
+    """Every nav link/button must reverse.
+
+    The sidebar is rendered on every templated page, and NetBox reverses each
+    ``MenuItem.link`` / ``MenuItemButton.link`` via ``reverse_lazy`` at render
+    time without catching ``NoReverseMatch``. A single unregistered URL name
+    (e.g. a writable model missing its ``add`` view) therefore 500s the entire
+    UI. This test fails fast on that class of regression.
+    """
+    from netbox_ceph.navigation import menu  # noqa: PLC0415
+
+    link_names: set[str] = set()
+    for group in menu.groups:
+        for item in group.items:
+            if item.link:
+                link_names.add(item.link)
+            for button in item.buttons:
+                if button.link:
+                    link_names.add(button.link)
+
+    assert link_names, "navigation menu exposed no links"
+    for link_name in sorted(link_names):
+        # Raises NoReverseMatch if the URL name is not registered.
+        reverse(link_name)
+
+
 def test_reflected_inventory_viewsets_remain_read_only() -> None:
     reflected_viewsets = (
         views.CephClusterViewSet,
