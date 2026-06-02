@@ -81,3 +81,44 @@ ssh nmc-prod-207 -- deploy-plugin ceph v0.1.0
 ```
 
 For comprehensive deploy infrastructure documentation, see `/root/personal-context/nmulticloud-context/CLAUDE.md` section "Automatic Plugin Deployment to Production".
+
+---
+
+# netbox-ceph Architecture Notes
+
+## Ceph v2 Desired-State And Operations Foundation
+
+`netbox-ceph` keeps the v1 reflected inventory models intact and read-only.
+`CephCluster`, `CephDaemon`, `CephOSD`, `CephPool`, `CephFilesystem`,
+`CephCrushRule`, `CephFlag`, and `CephHealthCheck` continue to mirror
+Proxmox-managed Ceph state.
+
+Ceph v2 adds a separate NetBox control-plane foundation:
+
+- `CephProvider` records backend/provider references and capability metadata.
+- `CephOperation` records requested desired-state actions.
+- `CephPlan` records provider-generated previews.
+- `CephValidationResult` records plan findings.
+- `CephOperationRun` records apply attempts and backend task references.
+- `CephDriftRecord` records desired-vs-actual comparison state.
+- `CephMetricSnapshot` records latest metric payloads by scope.
+
+Writable v2 objects are providers, operations, plans, validation results, and
+operation runs. Drift records and metric snapshots are read-only API/UI surfaces.
+
+## Secret-Ref Rule
+
+NetBox must never store actual Ceph provider secrets. `credential_ref` is an
+opaque pointer only. Passwords, tokens, access keys, secret keys, and other
+credentials live in proxbox-api or its secret store. Payloads logged or stored
+through the v2 orchestrator path must pass through `redact_secrets()`.
+
+## Orchestrator Feature Detection
+
+`netbox_ceph.services.orchestrator.CephOrchestratorClient` calls proxbox-api
+`/ceph/v2/*` routes using the existing `netbox_proxbox` FastAPI request
+context. HTTP 404/501 becomes `CephOrchestratorUnsupported`; connection errors
+become `CephOrchestratorUnavailable`.
+
+Unsupported operations fail clearly. Do not add shell command fallbacks or local
+Ceph CLI execution paths.

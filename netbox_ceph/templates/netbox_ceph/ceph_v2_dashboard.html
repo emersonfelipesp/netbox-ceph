@@ -1,0 +1,120 @@
+{% extends 'base/layout.html' %}
+{% block title %}Ceph v2{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col col-md-4">
+    <div class="card">
+      <h5 class="card-header">Cluster Health</h5>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for item in cluster_health %}
+              <tr>
+                <th scope="row">{{ item.health|default:"unknown" }}</th>
+                <td class="text-end font-monospace">{{ item.count }}</td>
+              </tr>
+            {% empty %}
+              <tr><td class="text-muted">No clusters</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-4">
+    <div class="card">
+      <h5 class="card-header">Provider Status</h5>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for item in provider_status %}
+              <tr>
+                <th scope="row">{{ item.status|default:"unknown" }}</th>
+                <td class="text-end font-monospace">{{ item.count }}</td>
+              </tr>
+            {% empty %}
+              <tr><td class="text-muted">No providers</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-4">
+    <div class="card">
+      <h5 class="card-header">Drift</h5>
+      <div class="card-body">
+        <div class="display-6 font-monospace">{{ drift_count }}</div>
+        <a href="{% url 'plugins:netbox_ceph:cephdriftrecord_list' %}" class="btn btn-sm btn-outline-secondary mt-2">Drift records</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col col-md-7">
+    <div class="card">
+      <h5 class="card-header">Recent Operations</h5>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Cluster</th>
+              <th>Provider</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for operation in recent_operations %}
+              <tr>
+                <td>
+                  <a href="{{ operation.get_absolute_url }}">{{ operation.operation_type }} {{ operation.target_kind }}{% if operation.target_ref %}:{{ operation.target_ref }}{% endif %}</a>
+                </td>
+                <td>{{ operation.status }}</td>
+                <td><a href="{{ operation.cluster.get_absolute_url }}">{{ operation.cluster }}</a></td>
+                <td>
+                  {% if operation.provider %}
+                    <a href="{{ operation.provider.get_absolute_url }}">{{ operation.provider }}</a>
+                  {% else %}
+                    <span class="text-muted">None</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-muted">No operations</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-5">
+    <div class="card">
+      <h5 class="card-header">Latest Metric Snapshots</h5>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Scope</th>
+              <th>Object</th>
+              <th>Captured</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for snapshot in latest_metric_snapshots %}
+              <tr>
+                <td>{{ snapshot.scope }}</td>
+                <td><a href="{{ snapshot.get_absolute_url }}">{{ snapshot.object_ref|default:"cluster" }}</a></td>
+                <td>{{ snapshot.captured_at|default:"" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-muted">No metric snapshots</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

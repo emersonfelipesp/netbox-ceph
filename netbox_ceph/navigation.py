@@ -12,10 +12,24 @@ _buttons = {
             icon_class="mdi mdi-cog",
         ),
     ],
+    "provider": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephprovider_add",
+            title="Add provider",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "operation": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephoperation_add",
+            title="Add operation",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
 }
 
 
-_items = (
+_inventory_items = (
     PluginMenuItem(
         link="plugins:netbox_ceph:cephcluster_list",
         link_text="Clusters",
@@ -64,9 +78,54 @@ _items = (
     ),
 )
 
+_v2_items = (
+    PluginMenuItem(
+        link="plugins:netbox_ceph:ceph_v2_dashboard",
+        link_text="Dashboard",
+        permissions=["netbox_ceph.view_cephcluster"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephprovider_list",
+        link_text="Providers",
+        permissions=["netbox_ceph.view_cephprovider"],
+        buttons=_buttons["provider"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephoperation_list",
+        link_text="Operations",
+        permissions=["netbox_ceph.view_cephoperation"],
+        buttons=_buttons["operation"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephplan_list",
+        link_text="Plans",
+        permissions=["netbox_ceph.view_cephplan"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephvalidationresult_list",
+        link_text="Validation Results",
+        permissions=["netbox_ceph.view_cephvalidationresult"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephoperationrun_list",
+        link_text="Operation Runs",
+        permissions=["netbox_ceph.view_cephoperationrun"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephdriftrecord_list",
+        link_text="Drift Records",
+        permissions=["netbox_ceph.view_cephdriftrecord"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephmetricsnapshot_list",
+        link_text="Metric Snapshots",
+        permissions=["netbox_ceph.view_cephmetricsnapshot"],
+    ),
+)
+
 
 menu = PluginMenu(
     label="Ceph",
-    groups=(("Inventory", _items),),
+    groups=(("Inventory", _inventory_items), ("Ceph v2", _v2_items)),
     icon_class="mdi mdi-database-clock",
 )

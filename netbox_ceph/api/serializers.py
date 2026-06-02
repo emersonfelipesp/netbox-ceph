@@ -9,12 +9,19 @@ from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
     CephDaemon,
+    CephDriftRecord,
     CephFilesystem,
     CephFlag,
     CephHealthCheck,
+    CephMetricSnapshot,
+    CephOperation,
+    CephOperationRun,
     CephOSD,
+    CephPlan,
     CephPluginSettings,
     CephPool,
+    CephProvider,
+    CephValidationResult,
 )
 
 
@@ -276,3 +283,206 @@ class CephHealthCheckSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "name", "severity")
+
+
+class CephProviderSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephprovider-detail"
+    )
+
+    class Meta:
+        model = CephProvider
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "kind",
+            "name",
+            "enabled",
+            "is_default",
+            "base_url",
+            "verify_ssl",
+            "credential_ref",
+            "capabilities",
+            "status",
+            "status_detail",
+            "last_checked_at",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "kind", "status")
+
+
+class CephOperationSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephoperation-detail"
+    )
+
+    class Meta:
+        model = CephOperation
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "operation_type",
+            "target_kind",
+            "target_ref",
+            "desired",
+            "status",
+            "is_destructive",
+            "confirmation_required",
+            "confirmed",
+            "confirmed_by",
+            "confirmed_at",
+            "requested_by",
+            "source_branch_schema_id",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "operation_type", "target_kind", "status")
+
+
+class CephPlanSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephplan-detail"
+    )
+
+    class Meta:
+        model = CephPlan
+        fields = (
+            "id",
+            "url",
+            "display",
+            "operation",
+            "status",
+            "summary",
+            "intended_changes",
+            "provider_target",
+            "blast_radius",
+            "expected_tasks",
+            "rollback_limits",
+            "is_destructive",
+            "generated_at",
+            "raw",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "operation", "status")
+
+
+class CephValidationResultSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephvalidationresult-detail"
+    )
+
+    class Meta:
+        model = CephValidationResult
+        fields = (
+            "id",
+            "url",
+            "display",
+            "plan",
+            "operation",
+            "severity",
+            "code",
+            "message",
+            "target",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "severity", "code")
+
+
+class CephOperationRunSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephoperationrun-detail"
+    )
+
+    class Meta:
+        model = CephOperationRun
+        fields = (
+            "id",
+            "url",
+            "display",
+            "operation",
+            "plan",
+            "provider",
+            "status",
+            "actor",
+            "source_branch_schema_id",
+            "provider_task_ref",
+            "started_at",
+            "finished_at",
+            "result",
+            "warnings",
+            "error",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "operation", "status")
+
+
+class CephDriftRecordSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephdriftrecord-detail"
+    )
+
+    class Meta:
+        model = CephDriftRecord
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "object_kind",
+            "object_ref",
+            "drift_status",
+            "desired_summary",
+            "actual_summary",
+            "detected_at",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "object_kind", "object_ref", "drift_status")
+
+
+class CephMetricSnapshotSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephmetricsnapshot-detail"
+    )
+
+    class Meta:
+        model = CephMetricSnapshot
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "scope",
+            "object_ref",
+            "metrics",
+            "source",
+            "captured_at",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "scope", "object_ref", "captured_at")

@@ -20,10 +20,18 @@ _MODEL_ROUTES = (
     ("cephflag", "flags"),
     ("cephhealthcheck", "health-checks"),
     ("cephpluginsettings", "settings"),
+    ("cephprovider", "providers"),
+    ("cephoperation", "operations"),
+    ("cephplan", "plans"),
+    ("cephvalidationresult", "validation-results"),
+    ("cephoperationrun", "operation-runs"),
+    ("cephdriftrecord", "drift-records"),
+    ("cephmetricsnapshot", "metric-snapshots"),
 )
 
 urlpatterns = [
     path("", views.CephHomeView.as_view(), name="home"),
+    path("v2/", views.CephV2DashboardView.as_view(), name="ceph_v2_dashboard"),
     path("sitemap.txt", SitemapView.as_view(), name="sitemap"),
     path(
         "settings/edit/",
