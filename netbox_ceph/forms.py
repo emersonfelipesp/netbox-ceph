@@ -18,6 +18,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -27,6 +28,7 @@ from netbox_ceph.models import (
     CephPlan,
     CephPluginSettings,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -270,3 +272,68 @@ class CephMetricSnapshotFilterForm(NetBoxModelFilterSetForm):
     scope = forms.CharField(required=False)
     object_ref = forms.CharField(required=False)
     source = forms.CharField(required=False)
+
+
+# ---------------------------------------------------------------------------
+# Desired-state config forms (writable)
+# ---------------------------------------------------------------------------
+
+
+class CephPoolDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephPoolDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "size",
+            "min_size",
+            "pg_autoscale_mode",
+            "crush_rule_name",
+            "application",
+            "target_size_ratio",
+            "quota_max_bytes",
+            "quota_max_objects",
+            "compression_mode",
+            "erasure_code_profile",
+            "parameters",
+            "tags",
+        )
+
+
+class CephFilesystemDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephFilesystemDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "metadata_pool",
+            "data_pools",
+            "mds_placement",
+            "standby_count",
+            "max_mds",
+            "quota_max_bytes",
+            "parameters",
+            "tags",
+        )
+
+
+class CephPoolDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephPoolDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    name = forms.CharField(required=False)
+    application = forms.CharField(required=False)
+    pg_autoscale_mode = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+
+
+class CephFilesystemDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephFilesystemDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)

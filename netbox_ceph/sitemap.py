@@ -77,6 +77,16 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
             ("metric-snapshots-list", "/plugins/ceph/metric-snapshots/"),
         ],
     ),
+    (
+        "Desired State",
+        [
+            ("pool-desired-states-list", "/plugins/ceph/pool-desired-states/"),
+            (
+                "filesystem-desired-states-list",
+                "/plugins/ceph/filesystem-desired-states/",
+            ),
+        ],
+    ),
 ]
 
 # Detail pages that require a {pk} — excluded from the static sitemap.

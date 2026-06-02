@@ -26,6 +26,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -35,6 +36,7 @@ from netbox_ceph.models import (
     CephPlan,
     CephPluginSettings,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -428,3 +430,18 @@ class CephMetricSnapshotViewSet(NetBoxModelViewSet):
     serializer_class = serializers.CephMetricSnapshotSerializer
     filterset_class = filtersets.CephMetricSnapshotFilterSet
     http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+# Desired-state config models are fully writable (NetBox is the source of truth).
+class CephPoolDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephPoolDesiredState.objects.select_related("cluster", "provider").all()
+    serializer_class = serializers.CephPoolDesiredStateSerializer
+    filterset_class = filtersets.CephPoolDesiredStateFilterSet
+
+
+class CephFilesystemDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephFilesystemDesiredState.objects.select_related(
+        "cluster", "provider", "metadata_pool"
+    ).all()
+    serializer_class = serializers.CephFilesystemDesiredStateSerializer
+    filterset_class = filtersets.CephFilesystemDesiredStateFilterSet

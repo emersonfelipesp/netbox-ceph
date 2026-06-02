@@ -26,10 +26,12 @@ from netbox_ceph.api import serializers, views  # noqa: E402
 from netbox_ceph.choices import CephOperationStatusChoices  # noqa: E402
 from netbox_ceph.models import (  # noqa: E402
     CephDriftRecord,
+    CephFilesystemDesiredState,
     CephMetricSnapshot,
     CephOperation,
     CephOperationRun,
     CephPlan,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -99,6 +101,74 @@ def test_apply_action_rejects_unplanned_operation_before_backend_call() -> None:
 
     assert response.status_code == 400
     assert "planned" in response.data["detail"]
+
+
+def test_desired_state_identity_constraints_are_named() -> None:
+    constraints = {
+        CephPoolDesiredState: "netbox_ceph_pool_desired_identity",
+        CephFilesystemDesiredState: "netbox_ceph_filesystem_desired_identity",
+    }
+    for model, constraint_name in constraints.items():
+        assert constraint_name in {c.name for c in model._meta.constraints}
+
+
+@pytest.mark.parametrize(
+    ("model", "route_name"),
+    [
+        (CephPoolDesiredState, "cephpooldesiredstate"),
+        (CephFilesystemDesiredState, "cephfilesystemdesiredstate"),
+    ],
+)
+def test_desired_state_models_reverse_absolute_urls(model, route_name: str) -> None:
+    obj = model(pk=77)
+    assert obj.get_absolute_url() == reverse(f"plugins:netbox_ceph:{route_name}", args=[77])
+
+
+@pytest.mark.parametrize(
+    "route_name",
+    ["cephpooldesiredstate", "cephfilesystemdesiredstate"],
+)
+def test_desired_state_writable_crud_urls_registered(route_name: str) -> None:
+    # Writable models must expose add/edit/delete/list, or the nav/list UI 500s
+    # (a missing ``add`` route was the Part 1 regression this guards against).
+    assert reverse(f"plugins:netbox_ceph:{route_name}_add")
+    assert reverse(f"plugins:netbox_ceph:{route_name}_list")
+    assert reverse(f"plugins:netbox_ceph:{route_name}_edit", args=[1])
+    assert reverse(f"plugins:netbox_ceph:{route_name}_delete", args=[1])
+
+
+def test_desired_state_serializer_fields_are_present() -> None:
+    expected = {
+        serializers.CephPoolDesiredStateSerializer: {
+            "cluster",
+            "name",
+            "size",
+            "min_size",
+            "pg_autoscale_mode",
+            "application",
+            "compression_mode",
+        },
+        serializers.CephFilesystemDesiredStateSerializer: {
+            "cluster",
+            "name",
+            "metadata_pool",
+            "data_pools",
+            "standby_count",
+            "max_mds",
+        },
+    }
+    for serializer_cls, fields in expected.items():
+        assert fields.issubset(set(serializer_cls.Meta.fields))
+
+
+def test_desired_state_viewsets_allow_writes() -> None:
+    for viewset_cls in (
+        views.CephPoolDesiredStateViewSet,
+        views.CephFilesystemDesiredStateViewSet,
+    ):
+        # No read-only restriction: POST/PATCH/DELETE must be permitted.
+        methods = getattr(viewset_cls, "http_method_names", None)
+        assert methods is None or "post" in methods
 
 
 def test_navigation_links_and_buttons_all_reverse() -> None:

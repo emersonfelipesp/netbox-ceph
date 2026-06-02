@@ -12,6 +12,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -20,6 +21,7 @@ from netbox_ceph.models import (
     CephOSD,
     CephPlan,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -476,4 +478,71 @@ class CephMetricSnapshotTable(NetBoxTable):
             "provider",
             "source",
             "captured_at",
+        )
+
+
+class CephPoolDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephPoolDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "enabled",
+            "size",
+            "min_size",
+            "pg_autoscale_mode",
+            "application",
+            "crush_rule_name",
+            "compression_mode",
+            "erasure_code_profile",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "enabled",
+            "size",
+            "min_size",
+            "application",
+            "pg_autoscale_mode",
+        )
+
+
+class CephFilesystemDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    metadata_pool = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephFilesystemDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "enabled",
+            "metadata_pool",
+            "mds_placement",
+            "standby_count",
+            "max_mds",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "enabled",
+            "metadata_pool",
+            "standby_count",
+            "max_mds",
         )

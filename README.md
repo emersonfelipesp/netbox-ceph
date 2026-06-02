@@ -14,9 +14,14 @@ behavior.
 Ceph v2 adds the NetBox desired-state and operations foundation alongside the
 read-only v1 inventory: provider references, operation requests, generated
 plans, validation findings, apply-run audit records, drift records, metric
-snapshots, and a feature-detecting proxbox-api orchestrator client. Resource
-configuration for pools, CephFS, RGW, and RBD remains out of scope for this
-foundation.
+snapshots, and a feature-detecting proxbox-api orchestrator client.
+
+Desired-state configuration objects (`CephPoolDesiredState`,
+`CephFilesystemDesiredState`) let operators declare NetBox-first pool and CephFS
+intent — size, autoscale, CRUSH rule, application, quotas, compression, CephFS
+metadata/data pools, and MDS placement — which a `CephOperation` references to
+produce a plan and, after validation, an apply run through the orchestrator.
+RGW/S3 and RBD desired-state remain out of scope for this milestone.
 
 ## Included Models
 
@@ -29,6 +34,8 @@ foundation.
 - Ceph flags
 - Ceph health checks
 - Ceph plugin settings
+- Ceph pool desired state (v2)
+- Ceph filesystem desired state (v2)
 
 ## Compatibility
 

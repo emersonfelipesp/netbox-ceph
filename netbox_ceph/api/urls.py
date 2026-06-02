@@ -25,5 +25,7 @@ router.register("validation-results", views.CephValidationResultViewSet)
 router.register("operation-runs", views.CephOperationRunViewSet)
 router.register("drift-records", views.CephDriftRecordViewSet)
 router.register("metric-snapshots", views.CephMetricSnapshotViewSet)
+router.register("pool-desired-states", views.CephPoolDesiredStateViewSet)
+router.register("filesystem-desired-states", views.CephFilesystemDesiredStateViewSet)
 
 urlpatterns = router.urls

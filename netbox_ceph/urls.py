@@ -27,6 +27,8 @@ _MODEL_ROUTES = (
     ("cephoperationrun", "operation-runs"),
     ("cephdriftrecord", "drift-records"),
     ("cephmetricsnapshot", "metric-snapshots"),
+    ("cephpooldesiredstate", "pool-desired-states"),
+    ("cephfilesystemdesiredstate", "filesystem-desired-states"),
 )
 
 urlpatterns = [

@@ -25,6 +25,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -34,6 +35,7 @@ from netbox_ceph.models import (
     CephPlan,
     CephPluginSettings,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -307,4 +309,22 @@ _register_readonly(
     tables.CephMetricSnapshotTable,
     filtersets.CephMetricSnapshotFilterSet,
     forms.CephMetricSnapshotFilterForm,
+)
+
+# Desired-state config models are writable: NetBox is the source of truth.
+# _register_writable registers add + edit + delete + list + detail; the `add`
+# route is required by the navigation buttons (see views.py header note).
+_register_writable(
+    CephPoolDesiredState,
+    tables.CephPoolDesiredStateTable,
+    filtersets.CephPoolDesiredStateFilterSet,
+    forms.CephPoolDesiredStateFilterForm,
+    forms.CephPoolDesiredStateForm,
+)
+_register_writable(
+    CephFilesystemDesiredState,
+    tables.CephFilesystemDesiredStateTable,
+    filtersets.CephFilesystemDesiredStateFilterSet,
+    forms.CephFilesystemDesiredStateFilterForm,
+    forms.CephFilesystemDesiredStateForm,
 )

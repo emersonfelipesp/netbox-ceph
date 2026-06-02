@@ -37,6 +37,8 @@ LIST_PAGES: list[tuple[str, str]] = [
     ("operation-runs-list", "/plugins/ceph/operation-runs/"),
     ("drift-records-list", "/plugins/ceph/drift-records/"),
     ("metric-snapshots-list", "/plugins/ceph/metric-snapshots/"),
+    ("pool-desired-states-list", "/plugins/ceph/pool-desired-states/"),
+    ("filesystem-desired-states-list", "/plugins/ceph/filesystem-desired-states/"),
 ]
 
 

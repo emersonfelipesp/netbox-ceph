@@ -12,6 +12,9 @@ from netbox_ceph.choices import (  # noqa: E402
     CephOperationStatusChoices,
     CephOperationTypeChoices,
     CephPlanStatusChoices,
+    CephPoolApplicationChoices,
+    CephPoolAutoscaleChoices,
+    CephPoolCompressionChoices,
     CephProviderKindChoices,
     CephProviderStatusChoices,
     CephValidationSeverityChoices,
@@ -64,6 +67,9 @@ def test_v2_choice_sets_have_expected_values_and_colors() -> None:
         },
         CephValidationSeverityChoices: {"info", "warning", "error", "blocker"},
         CephMetricScopeChoices: {"cluster", "daemon", "pool", "osd", "cephfs", "rgw", "rbd"},
+        CephPoolAutoscaleChoices: {"on", "warn", "off"},
+        CephPoolApplicationChoices: {"rbd", "cephfs", "rgw", "other"},
+        CephPoolCompressionChoices: {"none", "passive", "aggressive", "force"},
     }
 
     for choice_set, values in expected.items():

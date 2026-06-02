@@ -26,6 +26,20 @@ _buttons = {
             icon_class="mdi mdi-plus-thick",
         ),
     ],
+    "pool_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephpooldesiredstate_add",
+            title="Add desired pool",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "filesystem_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephfilesystemdesiredstate_add",
+            title="Add desired filesystem",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
 }
 
 
@@ -124,8 +138,28 @@ _v2_items = (
 )
 
 
+_desired_state_items = (
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephpooldesiredstate_list",
+        link_text="Pools",
+        permissions=["netbox_ceph.view_cephpooldesiredstate"],
+        buttons=_buttons["pool_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephfilesystemdesiredstate_list",
+        link_text="Filesystems",
+        permissions=["netbox_ceph.view_cephfilesystemdesiredstate"],
+        buttons=_buttons["filesystem_desired"],
+    ),
+)
+
+
 menu = PluginMenu(
     label="Ceph",
-    groups=(("Inventory", _inventory_items), ("Ceph v2", _v2_items)),
+    groups=(
+        ("Inventory", _inventory_items),
+        ("Ceph v2", _v2_items),
+        ("Desired State", _desired_state_items),
+    ),
     icon_class="mdi mdi-database-clock",
 )

@@ -106,6 +106,34 @@ Ceph v2 adds a separate NetBox control-plane foundation:
 Writable v2 objects are providers, operations, plans, validation results, and
 operation runs. Drift records and metric snapshots are read-only API/UI surfaces.
 
+## Ceph v2 Desired-State Configuration Objects
+
+Ceph v2 separates **reflected** inventory (what Proxmox reports) from
+**desired** configuration (what an operator wants NetBox to drive). The
+reflected models (`CephPool`, `CephFilesystem`, …) stay read-only; the desired
+models are the NetBox-first, operator-editable source of intent:
+
+- `CephPoolDesiredState` — desired RADOS pool config: `size`, `min_size`,
+  `pg_autoscale_mode`, `crush_rule_name`, `application`, `target_size_ratio`,
+  quotas (`quota_max_bytes`, `quota_max_objects`), `compression_mode`,
+  `erasure_code_profile`, and a free-form `parameters` JSON map. Unique per
+  (`cluster`, `name`) via `netbox_ceph_pool_desired_identity`.
+- `CephFilesystemDesiredState` — desired CephFS config: `metadata_pool` (FK to a
+  `CephPoolDesiredState`), `data_pools` (JSON list), `mds_placement`,
+  `standby_count`, `max_mds`, `quota_max_bytes`, and `parameters`. Unique per
+  (`cluster`, `name`) via `netbox_ceph_filesystem_desired_identity`.
+
+Both models are writable NetBox objects (full CRUD UI + REST). An operator edits
+desired state, then a `CephOperation` (with `target_kind=pool`/`cephfs`)
+references it to produce a `CephPlan` preview and, after validation, a
+`CephOperationRun` apply attempt through the orchestrator. Desired-state objects
+hold no secrets — provider credentials remain `credential_ref` pointers only.
+
+REST endpoints: `/api/plugins/ceph/pool-desired-states/` and
+`/api/plugins/ceph/filesystem-desired-states/`. UI lives under the **Desired
+State** navigation group. See `docs/v2/desired-state.md` for the full field
+reference and reconciliation flow.
+
 ## Secret-Ref Rule
 
 NetBox must never store actual Ceph provider secrets. `credential_ref` is an

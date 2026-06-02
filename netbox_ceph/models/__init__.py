@@ -11,6 +11,10 @@ from netbox_ceph.models.ceph import (
     CephPluginSettings,
     CephPool,
 )
+from netbox_ceph.models.desired_state import (
+    CephFilesystemDesiredState,
+    CephPoolDesiredState,
+)
 from netbox_ceph.models.metrics import CephMetricSnapshot
 from netbox_ceph.models.operations import (
     CephDriftRecord,
@@ -27,6 +31,7 @@ __all__ = [
     "CephDaemon",
     "CephDriftRecord",
     "CephFilesystem",
+    "CephFilesystemDesiredState",
     "CephFlag",
     "CephHealthCheck",
     "CephMetricSnapshot",
@@ -36,6 +41,7 @@ __all__ = [
     "CephPlan",
     "CephPluginSettings",
     "CephPool",
+    "CephPoolDesiredState",
     "CephProvider",
     "CephValidationResult",
 ]

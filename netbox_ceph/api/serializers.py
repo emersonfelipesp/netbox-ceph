@@ -11,6 +11,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -20,6 +21,7 @@ from netbox_ceph.models import (
     CephPlan,
     CephPluginSettings,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -486,3 +488,67 @@ class CephMetricSnapshotSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "scope", "object_ref", "captured_at")
+
+
+class CephPoolDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephpooldesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephPoolDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "size",
+            "min_size",
+            "pg_autoscale_mode",
+            "crush_rule_name",
+            "application",
+            "target_size_ratio",
+            "quota_max_bytes",
+            "quota_max_objects",
+            "compression_mode",
+            "erasure_code_profile",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "application", "enabled")
+
+
+class CephFilesystemDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephfilesystemdesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephFilesystemDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "metadata_pool",
+            "data_pools",
+            "mds_placement",
+            "standby_count",
+            "max_mds",
+            "quota_max_bytes",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "enabled")

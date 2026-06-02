@@ -15,6 +15,7 @@ from netbox_ceph.models import (
     CephDaemon,
     CephDriftRecord,
     CephFilesystem,
+    CephFilesystemDesiredState,
     CephFlag,
     CephHealthCheck,
     CephMetricSnapshot,
@@ -23,6 +24,7 @@ from netbox_ceph.models import (
     CephOSD,
     CephPlan,
     CephPool,
+    CephPoolDesiredState,
     CephProvider,
     CephValidationResult,
 )
@@ -214,3 +216,28 @@ class CephMetricSnapshotFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
     class Meta:
         model = CephMetricSnapshot
         fields = ("id", "cluster", "provider", "scope", "object_ref", "source")
+
+
+class CephPoolDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "crush_rule_name")
+
+    class Meta:
+        model = CephPoolDesiredState
+        fields = (
+            "id",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "application",
+            "pg_autoscale_mode",
+            "compression_mode",
+        )
+
+
+class CephFilesystemDesiredStateFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "mds_placement")
+
+    class Meta:
+        model = CephFilesystemDesiredState
+        fields = ("id", "cluster", "provider", "name", "enabled", "metadata_pool")

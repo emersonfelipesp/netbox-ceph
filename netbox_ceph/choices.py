@@ -212,6 +212,58 @@ class CephValidationSeverityChoices(ChoiceSet):
     ]
 
 
+class CephPoolAutoscaleChoices(ChoiceSet):
+    """Desired PG autoscale mode for a Ceph pool."""
+
+    key = "CephPoolDesiredState.pg_autoscale_mode"
+
+    MODE_ON = "on"
+    MODE_WARN = "warn"
+    MODE_OFF = "off"
+
+    CHOICES = [
+        (MODE_ON, _("On"), "green"),
+        (MODE_WARN, _("Warn"), "yellow"),
+        (MODE_OFF, _("Off"), "gray"),
+    ]
+
+
+class CephPoolApplicationChoices(ChoiceSet):
+    """Intended application tag for a Ceph pool."""
+
+    key = "CephPoolDesiredState.application"
+
+    APP_RBD = "rbd"
+    APP_CEPHFS = "cephfs"
+    APP_RGW = "rgw"
+    APP_OTHER = "other"
+
+    CHOICES = [
+        (APP_RBD, _("RBD"), "blue"),
+        (APP_CEPHFS, _("CephFS"), "green"),
+        (APP_RGW, _("RGW"), "yellow"),
+        (APP_OTHER, _("Other"), "gray"),
+    ]
+
+
+class CephPoolCompressionChoices(ChoiceSet):
+    """Desired compression mode for a Ceph pool."""
+
+    key = "CephPoolDesiredState.compression_mode"
+
+    MODE_NONE = "none"
+    MODE_PASSIVE = "passive"
+    MODE_AGGRESSIVE = "aggressive"
+    MODE_FORCE = "force"
+
+    CHOICES = [
+        (MODE_NONE, _("None"), "gray"),
+        (MODE_PASSIVE, _("Passive"), "blue"),
+        (MODE_AGGRESSIVE, _("Aggressive"), "orange"),
+        (MODE_FORCE, _("Force"), "red"),
+    ]
+
+
 class CephMetricScopeChoices(ChoiceSet):
     """Metric snapshot target scope."""
 

@@ -63,6 +63,7 @@ nav:
   - Ceph v2:
       - Overview: v2/overview.md
       - Providers: v2/providers.md
+      - Desired State: v2/desired-state.md
       - Plan And Apply: v2/plan-apply.md
       - Operations And Audit: v2/operations.md
   - Certification: certification.md
