@@ -41,6 +41,10 @@ LIST_PAGES: list[tuple[str, str]] = [
     ("filesystem-desired-states-list", "/plugins/ceph/filesystem-desired-states/"),
     ("rbd-image-desired-states-list", "/plugins/ceph/rbd-image-desired-states/"),
     ("rbd-snapshot-desired-states-list", "/plugins/ceph/rbd-snapshot-desired-states/"),
+    ("rgw-realm-desired-states-list", "/plugins/ceph/rgw-realm-desired-states/"),
+    ("rgw-zone-desired-states-list", "/plugins/ceph/rgw-zone-desired-states/"),
+    ("rgw-user-desired-states-list", "/plugins/ceph/rgw-user-desired-states/"),
+    ("rgw-bucket-desired-states-list", "/plugins/ceph/rgw-bucket-desired-states/"),
 ]
 
 

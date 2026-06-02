@@ -31,6 +31,10 @@ _MODEL_ROUTES = (
     ("cephfilesystemdesiredstate", "filesystem-desired-states"),
     ("cephrbdimagedesiredstate", "rbd-image-desired-states"),
     ("cephrbdsnapshotdesiredstate", "rbd-snapshot-desired-states"),
+    ("cephrgwrealmdesiredstate", "rgw-realm-desired-states"),
+    ("cephrgwzonedesiredstate", "rgw-zone-desired-states"),
+    ("cephrgwuserdesiredstate", "rgw-user-desired-states"),
+    ("cephrgwbucketdesiredstate", "rgw-bucket-desired-states"),
 )
 
 urlpatterns = [

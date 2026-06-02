@@ -130,17 +130,40 @@ models are the NetBox-first, operator-editable source of intent:
 - `CephRBDSnapshotDesiredState` — desired RBD snapshot intent: parent `image`,
   `name`, `protected`, and `parameters`. Unique per (`image`, `name`) via
   `netbox_ceph_rbd_snapshot_desired_identity`.
+- `CephRGWRealmDesiredState` — desired RGW realm config: `name`, `is_default`,
+  and `parameters`. Unique per (`cluster`, `name`) via
+  `netbox_ceph_rgw_realm_desired_identity`.
+- `CephRGWZoneDesiredState` — desired RGW zone config: optional parent `realm`,
+  `zonegroup_name`, `is_master`, `endpoints`, `placement_targets`, and
+  `parameters`. Unique per (`cluster`, `name`) via
+  `netbox_ceph_rgw_zone_desired_identity`.
+- `CephRGWUserDesiredState` — desired RGW/S3 user config: `uid`,
+  `display_name`, `email`, `tenant_name`, `suspended`, `max_buckets`,
+  quota limits (`quota_max_size_bytes`, `quota_max_objects`),
+  `credential_ref`, and `parameters`. Unique per (`cluster`, `uid`) via
+  `netbox_ceph_rgw_user_desired_identity`.
+- `CephRGWBucketDesiredState` — desired RGW/S3 bucket config: `name`, optional
+  owner, `placement_target`, `versioning_enabled`, quota limits
+  (`quota_max_size_bytes`, `quota_max_objects`), `lifecycle_policy`, and
+  `parameters`. Unique per (`cluster`, `name`) via
+  `netbox_ceph_rgw_bucket_desired_identity`.
 
 These models are writable NetBox objects (full CRUD UI + REST). An operator
 edits desired state, then a `CephOperation` references it to produce a
 `CephPlan` preview and, after validation, a `CephOperationRun` apply attempt
 through the orchestrator. Desired-state objects hold no secrets — provider
-credentials remain `credential_ref` pointers only.
+credentials remain `credential_ref` pointers only. RGW/S3 users may store only
+the opaque `credential_ref`; do not add or expose access keys, secret keys,
+passwords, or tokens in NetBox.
 
 REST endpoints: `/api/plugins/ceph/pool-desired-states/` and
 `/api/plugins/ceph/filesystem-desired-states/`,
 `/api/plugins/ceph/rbd-image-desired-states/`, and
-`/api/plugins/ceph/rbd-snapshot-desired-states/`. UI lives under the
+`/api/plugins/ceph/rbd-snapshot-desired-states/`,
+`/api/plugins/ceph/rgw-realm-desired-states/`,
+`/api/plugins/ceph/rgw-zone-desired-states/`,
+`/api/plugins/ceph/rgw-user-desired-states/`, and
+`/api/plugins/ceph/rgw-bucket-desired-states/`. UI lives under the
 **Desired State** navigation group. See `docs/v2/desired-state.md` for the full
 field reference and reconciliation flow.
 

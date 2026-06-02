@@ -5,9 +5,9 @@ the intended configuration an operator manages from NetBox, and they are kept
 strictly separate from the v1 reflected inventory models, which continue to
 mirror live Proxmox-managed state read-only.
 
-This increment covers **Pools**, **CephFS filesystems**, and **RBD image/snapshot**
-desired state. RGW/S3, CRUSH editing, and daemon desired-state are tracked in
-their own follow-up changes.
+This increment covers **Pools**, **CephFS filesystems**, **RBD image/snapshot**,
+and **RGW/S3 realm/zone/user/bucket** desired state. CRUSH editing and daemon
+desired-state are tracked in their own follow-up changes.
 
 ## Model Split
 
@@ -17,6 +17,10 @@ their own follow-up changes.
 | CephFS | `CephFilesystem` (read-only) | `CephFilesystemDesiredState` (writable) |
 | RBD image | n/a | `CephRBDImageDesiredState` (writable) |
 | RBD snapshot | n/a | `CephRBDSnapshotDesiredState` (writable) |
+| RGW realm | n/a | `CephRGWRealmDesiredState` (writable) |
+| RGW zone | n/a | `CephRGWZoneDesiredState` (writable) |
+| RGW user | n/a | `CephRGWUserDesiredState` (writable) |
+| RGW bucket | n/a | `CephRGWBucketDesiredState` (writable) |
 
 Reflected models answer "what does the cluster currently report?". Desired-state
 models answer "what should the cluster look like?". The reconciliation between
@@ -76,16 +80,43 @@ Captures the intended state of an RBD snapshot:
 - `protected` records whether the snapshot should be protected before cloning.
 - `parameters` stores provider-specific snapshot options.
 
+## RGW realm/zone/user/bucket desired state
+
+Captures the intended RGW/S3 configuration:
+
+- `CephRGWRealmDesiredState`: identity is `cluster` + unique `name`
+  (`netbox_ceph_rgw_realm_desired_identity`). Fields are optional `provider`,
+  `enabled`, `is_default`, and `parameters`.
+- `CephRGWZoneDesiredState`: identity is `cluster` + unique `name`
+  (`netbox_ceph_rgw_zone_desired_identity`). Fields are optional `provider`,
+  optional `realm`, `zonegroup_name`, `is_master`, `endpoints`,
+  `placement_targets`, `enabled`, and `parameters`.
+- `CephRGWUserDesiredState`: identity is `cluster` + unique `uid`
+  (`netbox_ceph_rgw_user_desired_identity`). Fields are optional `provider`,
+  `display_name`, `email`, `tenant_name`, `suspended`, `max_buckets`,
+  `quota_max_size_bytes`, `quota_max_objects`, `credential_ref`, `enabled`, and
+  `parameters`.
+- `CephRGWBucketDesiredState`: identity is `cluster` + unique `name`
+  (`netbox_ceph_rgw_bucket_desired_identity`). Fields are optional `provider`,
+  optional `owner`, `placement_target`, `versioning_enabled`,
+  `quota_max_size_bytes`, `quota_max_objects`, `lifecycle_policy`, `enabled`,
+  and `parameters`.
+
+RGW/S3 access keys are never stored in NetBox. `credential_ref` is the only
+credential-related desired-state field, and it is an opaque pointer to keys held
+by proxbox-api or its secret store. Do not add `access_key`, `secret_key`,
+`password`, or `token` fields to these models or serializers.
+
 ## Reconciliation Path
 
 Desired-state objects feed the existing plan/apply engine. An operator (or
 automation) creates a `CephOperation` whose `target_kind` is `pool`, `cephfs`,
-`rbd_image`, or `rbd_snapshot` and whose `desired` payload carries the serialized
-desired-state. The
+`rbd_image`, `rbd_snapshot`, `rgw_realm`, `rgw_zone`, `rgw_user`, or
+`rgw_bucket` and whose `desired` payload carries the serialized desired-state. The
 orchestrator client posts that to proxbox-api `/ceph/v2/plan` and
 `/ceph/v2/apply`, producing `CephPlan`, `CephValidationResult`, and
 `CephOperationRun` records. No new backend contract is introduced here — only
-the NetBox-side ability to express pool/CephFS desired state.
+the NetBox-side ability to express desired state.
 
 Secrets are never stored on desired-state objects. Provider credentials remain
 behind the provider's opaque `credential_ref`, and any payload crossing the
@@ -101,8 +132,16 @@ orchestrator boundary is redacted.
 - `GET/PUT/PATCH/DELETE /api/plugins/ceph/rbd-image-desired-states/{id}/`
 - `GET/POST /api/plugins/ceph/rbd-snapshot-desired-states/`
 - `GET/PUT/PATCH/DELETE /api/plugins/ceph/rbd-snapshot-desired-states/{id}/`
+- `GET/POST /api/plugins/ceph/rgw-realm-desired-states/`
+- `GET/PUT/PATCH/DELETE /api/plugins/ceph/rgw-realm-desired-states/{id}/`
+- `GET/POST /api/plugins/ceph/rgw-zone-desired-states/`
+- `GET/PUT/PATCH/DELETE /api/plugins/ceph/rgw-zone-desired-states/{id}/`
+- `GET/POST /api/plugins/ceph/rgw-user-desired-states/`
+- `GET/PUT/PATCH/DELETE /api/plugins/ceph/rgw-user-desired-states/{id}/`
+- `GET/POST /api/plugins/ceph/rgw-bucket-desired-states/`
+- `GET/PUT/PATCH/DELETE /api/plugins/ceph/rgw-bucket-desired-states/{id}/`
 
 ## UI
 
-Both models have full CRUD pages under the **Ceph → Desired State** navigation
-group, with list, detail, add, edit, and delete views.
+All desired-state models have full CRUD pages under the **Ceph -> Desired
+State** navigation group, with list, detail, add, edit, and delete views.

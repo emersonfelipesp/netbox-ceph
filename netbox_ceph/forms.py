@@ -32,6 +32,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -361,6 +365,78 @@ class CephRBDSnapshotDesiredStateForm(NetBoxModelForm):
         )
 
 
+class CephRGWRealmDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRGWRealmDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "is_default",
+            "parameters",
+            "tags",
+        )
+
+
+class CephRGWZoneDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRGWZoneDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "realm",
+            "zonegroup_name",
+            "is_master",
+            "endpoints",
+            "placement_targets",
+            "parameters",
+            "tags",
+        )
+
+
+class CephRGWUserDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRGWUserDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "uid",
+            "enabled",
+            "display_name",
+            "email",
+            "tenant_name",
+            "suspended",
+            "max_buckets",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "credential_ref",
+            "parameters",
+            "tags",
+        )
+
+
+class CephRGWBucketDesiredStateForm(NetBoxModelForm):
+    class Meta:
+        model = CephRGWBucketDesiredState
+        fields = (
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "owner",
+            "placement_target",
+            "versioning_enabled",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "lifecycle_policy",
+            "parameters",
+            "tags",
+        )
+
+
 class CephPoolDesiredStateFilterForm(NetBoxModelFilterSetForm):
     model = CephPoolDesiredState
     cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
@@ -398,3 +474,50 @@ class CephRBDSnapshotDesiredStateFilterForm(NetBoxModelFilterSetForm):
     name = forms.CharField(required=False)
     enabled = forms.NullBooleanField(required=False)
     protected = forms.NullBooleanField(required=False)
+
+
+class CephRGWRealmDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRGWRealmDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+    is_default = forms.NullBooleanField(required=False)
+
+
+class CephRGWZoneDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRGWZoneDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    realm = DynamicModelChoiceField(
+        queryset=CephRGWRealmDesiredState.objects.all(), required=False
+    )
+    name = forms.CharField(required=False)
+    zonegroup_name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+    is_master = forms.NullBooleanField(required=False)
+
+
+class CephRGWUserDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRGWUserDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    uid = forms.CharField(required=False)
+    display_name = forms.CharField(required=False)
+    email = forms.CharField(required=False)
+    tenant_name = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+    suspended = forms.NullBooleanField(required=False)
+
+
+class CephRGWBucketDesiredStateFilterForm(NetBoxModelFilterSetForm):
+    model = CephRGWBucketDesiredState
+    cluster = DynamicModelChoiceField(queryset=CephCluster.objects.all(), required=False)
+    provider = DynamicModelChoiceField(queryset=CephProvider.objects.all(), required=False)
+    owner = DynamicModelChoiceField(
+        queryset=CephRGWUserDesiredState.objects.all(), required=False
+    )
+    name = forms.CharField(required=False)
+    placement_target = forms.CharField(required=False)
+    enabled = forms.NullBooleanField(required=False)
+    versioning_enabled = forms.NullBooleanField(required=False)

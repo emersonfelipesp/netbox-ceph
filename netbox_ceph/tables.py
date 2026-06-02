@@ -25,6 +25,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -613,4 +617,135 @@ class CephRBDSnapshotDesiredStateTable(NetBoxTable):
             "image",
             "enabled",
             "protected",
+        )
+
+
+class CephRGWRealmDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    is_default = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWRealmDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "enabled",
+            "is_default",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "enabled",
+            "is_default",
+        )
+
+
+class CephRGWZoneDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    realm = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    is_master = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWZoneDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "realm",
+            "zonegroup_name",
+            "enabled",
+            "is_master",
+            "endpoints",
+            "placement_targets",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "realm",
+            "zonegroup_name",
+            "enabled",
+            "is_master",
+        )
+
+
+class CephRGWUserDesiredStateTable(NetBoxTable):
+    uid = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    suspended = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWUserDesiredState
+        fields = (
+            "pk",
+            "id",
+            "uid",
+            "cluster",
+            "provider",
+            "enabled",
+            "display_name",
+            "email",
+            "tenant_name",
+            "suspended",
+            "max_buckets",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "credential_ref",
+            "actions",
+        )
+        default_columns = (
+            "uid",
+            "cluster",
+            "enabled",
+            "display_name",
+            "tenant_name",
+            "suspended",
+        )
+
+
+class CephRGWBucketDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    owner = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    versioning_enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWBucketDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "owner",
+            "enabled",
+            "placement_target",
+            "versioning_enabled",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "owner",
+            "enabled",
+            "placement_target",
+            "versioning_enabled",
         )

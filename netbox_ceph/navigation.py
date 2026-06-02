@@ -54,6 +54,34 @@ _buttons = {
             icon_class="mdi mdi-plus-thick",
         ),
     ],
+    "rgw_realm_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrgwrealmdesiredstate_add",
+            title="Add desired RGW realm",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "rgw_zone_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrgwzonedesiredstate_add",
+            title="Add desired RGW zone",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "rgw_user_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrgwuserdesiredstate_add",
+            title="Add desired RGW user",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "rgw_bucket_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrgwbucketdesiredstate_add",
+            title="Add desired RGW bucket",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
 }
 
 
@@ -176,6 +204,30 @@ _desired_state_items = (
         link_text="RBD Snapshots",
         permissions=["netbox_ceph.view_cephrbdsnapshotdesiredstate"],
         buttons=_buttons["rbd_snapshot_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwrealmdesiredstate_list",
+        link_text="RGW Realms",
+        permissions=["netbox_ceph.view_cephrgwrealmdesiredstate"],
+        buttons=_buttons["rgw_realm_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwzonedesiredstate_list",
+        link_text="RGW Zones",
+        permissions=["netbox_ceph.view_cephrgwzonedesiredstate"],
+        buttons=_buttons["rgw_zone_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwuserdesiredstate_list",
+        link_text="RGW Users",
+        permissions=["netbox_ceph.view_cephrgwuserdesiredstate"],
+        buttons=_buttons["rgw_user_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwbucketdesiredstate_list",
+        link_text="RGW Buckets",
+        permissions=["netbox_ceph.view_cephrgwbucketdesiredstate"],
+        buttons=_buttons["rgw_bucket_desired"],
     ),
 )
 

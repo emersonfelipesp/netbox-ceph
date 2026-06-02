@@ -25,6 +25,10 @@ from netbox_ceph.models import (
     CephProvider,
     CephRBDImageDesiredState,
     CephRBDSnapshotDesiredState,
+    CephRGWBucketDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWZoneDesiredState,
     CephValidationResult,
 )
 
@@ -614,3 +618,119 @@ class CephRBDSnapshotDesiredStateSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "name", "image", "enabled")
+
+
+class CephRGWRealmDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrgwrealmdesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRGWRealmDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "is_default",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "enabled", "is_default")
+
+
+class CephRGWZoneDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrgwzonedesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRGWZoneDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "realm",
+            "zonegroup_name",
+            "is_master",
+            "endpoints",
+            "placement_targets",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "realm", "enabled")
+
+
+class CephRGWUserDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrgwuserdesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRGWUserDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "uid",
+            "enabled",
+            "display_name",
+            "email",
+            "tenant_name",
+            "suspended",
+            "max_buckets",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "credential_ref",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "uid", "enabled", "suspended")
+
+
+class CephRGWBucketDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrgwbucketdesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRGWBucketDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "name",
+            "enabled",
+            "owner",
+            "placement_target",
+            "versioning_enabled",
+            "quota_max_size_bytes",
+            "quota_max_objects",
+            "lifecycle_policy",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "owner", "enabled")
