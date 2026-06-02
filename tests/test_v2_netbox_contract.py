@@ -33,6 +33,8 @@ from netbox_ceph.models import (  # noqa: E402
     CephPlan,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -107,6 +109,8 @@ def test_desired_state_identity_constraints_are_named() -> None:
     constraints = {
         CephPoolDesiredState: "netbox_ceph_pool_desired_identity",
         CephFilesystemDesiredState: "netbox_ceph_filesystem_desired_identity",
+        CephRBDImageDesiredState: "netbox_ceph_rbd_image_desired_identity",
+        CephRBDSnapshotDesiredState: "netbox_ceph_rbd_snapshot_desired_identity",
     }
     for model, constraint_name in constraints.items():
         assert constraint_name in {c.name for c in model._meta.constraints}
@@ -117,6 +121,8 @@ def test_desired_state_identity_constraints_are_named() -> None:
     [
         (CephPoolDesiredState, "cephpooldesiredstate"),
         (CephFilesystemDesiredState, "cephfilesystemdesiredstate"),
+        (CephRBDImageDesiredState, "cephrbdimagedesiredstate"),
+        (CephRBDSnapshotDesiredState, "cephrbdsnapshotdesiredstate"),
     ],
 )
 def test_desired_state_models_reverse_absolute_urls(model, route_name: str) -> None:
@@ -126,7 +132,12 @@ def test_desired_state_models_reverse_absolute_urls(model, route_name: str) -> N
 
 @pytest.mark.parametrize(
     "route_name",
-    ["cephpooldesiredstate", "cephfilesystemdesiredstate"],
+    [
+        "cephpooldesiredstate",
+        "cephfilesystemdesiredstate",
+        "cephrbdimagedesiredstate",
+        "cephrbdsnapshotdesiredstate",
+    ],
 )
 def test_desired_state_writable_crud_urls_registered(route_name: str) -> None:
     # Writable models must expose add/edit/delete/list, or the nav/list UI 500s
@@ -156,6 +167,22 @@ def test_desired_state_serializer_fields_are_present() -> None:
             "standby_count",
             "max_mds",
         },
+        serializers.CephRBDImageDesiredStateSerializer: {
+            "cluster",
+            "pool_name",
+            "name",
+            "size_bytes",
+            "features",
+            "clone_parent_image",
+            "metadata",
+        },
+        serializers.CephRBDSnapshotDesiredStateSerializer: {
+            "cluster",
+            "image",
+            "name",
+            "protected",
+            "parameters",
+        },
     }
     for serializer_cls, fields in expected.items():
         assert fields.issubset(set(serializer_cls.Meta.fields))
@@ -165,6 +192,8 @@ def test_desired_state_viewsets_allow_writes() -> None:
     for viewset_cls in (
         views.CephPoolDesiredStateViewSet,
         views.CephFilesystemDesiredStateViewSet,
+        views.CephRBDImageDesiredStateViewSet,
+        views.CephRBDSnapshotDesiredStateViewSet,
     ):
         # No read-only restriction: POST/PATCH/DELETE must be permitted.
         methods = getattr(viewset_cls, "http_method_names", None)

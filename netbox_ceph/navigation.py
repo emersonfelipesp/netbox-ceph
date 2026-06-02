@@ -40,6 +40,20 @@ _buttons = {
             icon_class="mdi mdi-plus-thick",
         ),
     ],
+    "rbd_image_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrbdimagedesiredstate_add",
+            title="Add desired RBD image",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
+    "rbd_snapshot_desired": [
+        PluginMenuButton(
+            link="plugins:netbox_ceph:cephrbdsnapshotdesiredstate_add",
+            title="Add desired RBD snapshot",
+            icon_class="mdi mdi-plus-thick",
+        ),
+    ],
 }
 
 
@@ -150,6 +164,18 @@ _desired_state_items = (
         link_text="Filesystems",
         permissions=["netbox_ceph.view_cephfilesystemdesiredstate"],
         buttons=_buttons["filesystem_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrbdimagedesiredstate_list",
+        link_text="RBD Images",
+        permissions=["netbox_ceph.view_cephrbdimagedesiredstate"],
+        buttons=_buttons["rbd_image_desired"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrbdsnapshotdesiredstate_list",
+        link_text="RBD Snapshots",
+        permissions=["netbox_ceph.view_cephrbdsnapshotdesiredstate"],
+        buttons=_buttons["rbd_snapshot_desired"],
     ),
 )
 

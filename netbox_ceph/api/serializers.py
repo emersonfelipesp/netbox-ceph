@@ -23,6 +23,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -552,3 +554,63 @@ class CephFilesystemDesiredStateSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "name", "enabled")
+
+
+class CephRBDImageDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrbdimagedesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRBDImageDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "pool_name",
+            "name",
+            "enabled",
+            "size_bytes",
+            "features",
+            "object_size",
+            "stripe_unit",
+            "stripe_count",
+            "data_pool",
+            "clone_parent_image",
+            "clone_parent_snapshot",
+            "metadata",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "pool_name", "enabled")
+
+
+class CephRBDSnapshotDesiredStateSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephrbdsnapshotdesiredstate-detail"
+    )
+
+    class Meta:
+        model = CephRBDSnapshotDesiredState
+        fields = (
+            "id",
+            "url",
+            "display",
+            "cluster",
+            "provider",
+            "image",
+            "name",
+            "enabled",
+            "protected",
+            "parameters",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "name", "image", "enabled")

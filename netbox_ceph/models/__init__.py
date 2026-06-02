@@ -14,6 +14,8 @@ from netbox_ceph.models.ceph import (
 from netbox_ceph.models.desired_state import (
     CephFilesystemDesiredState,
     CephPoolDesiredState,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
 )
 from netbox_ceph.models.metrics import CephMetricSnapshot
 from netbox_ceph.models.operations import (
@@ -43,5 +45,7 @@ __all__ = [
     "CephPool",
     "CephPoolDesiredState",
     "CephProvider",
+    "CephRBDImageDesiredState",
+    "CephRBDSnapshotDesiredState",
     "CephValidationResult",
 ]

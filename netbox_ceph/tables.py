@@ -23,6 +23,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 
@@ -545,4 +547,70 @@ class CephFilesystemDesiredStateTable(NetBoxTable):
             "metadata_pool",
             "standby_count",
             "max_mds",
+        )
+
+
+class CephRBDImageDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    clone_parent_image = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRBDImageDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "pool_name",
+            "enabled",
+            "size_bytes",
+            "object_size",
+            "stripe_unit",
+            "stripe_count",
+            "data_pool",
+            "clone_parent_image",
+            "clone_parent_snapshot",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "pool_name",
+            "enabled",
+            "size_bytes",
+            "data_pool",
+        )
+
+
+class CephRBDSnapshotDesiredStateTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    provider = tables.Column(linkify=True)
+    image = tables.Column(linkify=True)
+    enabled = BooleanColumn()
+    protected = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRBDSnapshotDesiredState
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "cluster",
+            "provider",
+            "image",
+            "enabled",
+            "protected",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "cluster",
+            "image",
+            "enabled",
+            "protected",
         )

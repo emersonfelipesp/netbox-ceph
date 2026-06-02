@@ -38,6 +38,8 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
     CephValidationResult,
 )
 from netbox_ceph.services.http_client import CephBackendError
@@ -445,3 +447,19 @@ class CephFilesystemDesiredStateViewSet(NetBoxModelViewSet):
     ).all()
     serializer_class = serializers.CephFilesystemDesiredStateSerializer
     filterset_class = filtersets.CephFilesystemDesiredStateFilterSet
+
+
+class CephRBDImageDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRBDImageDesiredState.objects.select_related(
+        "cluster", "provider", "clone_parent_image"
+    ).all()
+    serializer_class = serializers.CephRBDImageDesiredStateSerializer
+    filterset_class = filtersets.CephRBDImageDesiredStateFilterSet
+
+
+class CephRBDSnapshotDesiredStateViewSet(NetBoxModelViewSet):
+    queryset = CephRBDSnapshotDesiredState.objects.select_related(
+        "cluster", "provider", "image"
+    ).all()
+    serializer_class = serializers.CephRBDSnapshotDesiredStateSerializer
+    filterset_class = filtersets.CephRBDSnapshotDesiredStateFilterSet

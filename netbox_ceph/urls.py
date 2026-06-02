@@ -29,6 +29,8 @@ _MODEL_ROUTES = (
     ("cephmetricsnapshot", "metric-snapshots"),
     ("cephpooldesiredstate", "pool-desired-states"),
     ("cephfilesystemdesiredstate", "filesystem-desired-states"),
+    ("cephrbdimagedesiredstate", "rbd-image-desired-states"),
+    ("cephrbdsnapshotdesiredstate", "rbd-snapshot-desired-states"),
 )
 
 urlpatterns = [
