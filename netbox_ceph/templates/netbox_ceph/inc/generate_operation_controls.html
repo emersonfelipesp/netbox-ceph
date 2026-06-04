@@ -1,0 +1,14 @@
+{% load helpers %}
+{% comment %}
+Shared control for desired-state detail pages: generate a CephOperation from the
+current desired-state row and open it. The URL is resolved generically from the
+object's model via the `viewname` filter.
+{% endcomment %}
+{% if perms.netbox_ceph.add_cephoperation %}
+  <form action="{% url object|viewname:'generate_operation' pk=object.pk %}" method="post" class="d-inline">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="mdi mdi-cog-play-outline"></i> Generate operation
+    </button>
+  </form>
+{% endif %}

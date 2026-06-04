@@ -145,3 +145,27 @@ orchestrator boundary is redacted.
 
 All desired-state models have full CRUD pages under the **Ceph -> Desired
 State** navigation group, with list, detail, add, edit, and delete views.
+
+## Generate operation (declarative → imperative)
+
+Each desired-state detail page has a **Generate operation** button. It builds a
+`CephOperation` from the row and opens it, ready to [plan and apply](plan-apply.md).
+No fields are duplicated by hand — the operation's `target_kind`, `target_ref`,
+and `desired` payload are derived from the desired-state row by
+`netbox_ceph.services.desired_state_operations`:
+
+| Desired-state model | `target_kind` | `target_ref` |
+|---|---|---|
+| `CephPoolDesiredState` | `pool` | `name` |
+| `CephFilesystemDesiredState` | `filesystem` | `name` |
+| `CephRBDImageDesiredState` | `rbd_image` | `pool/name` |
+| `CephRBDSnapshotDesiredState` | `rbd_snapshot` | `pool/image@snap` |
+| `CephRGWRealmDesiredState` | `rgw_realm` | `name` |
+| `CephRGWZoneDesiredState` | `rgw_zone` | `name` |
+| `CephRGWUserDesiredState` | `rgw_user` | `uid` |
+| `CephRGWBucketDesiredState` | `rgw_bucket` | `name` |
+
+Generated operations use `operation_type=reconcile` and are non-destructive: the
+proxbox-api Proxmox adapter resolves create/update/noop from live state, never a
+delete. RGW user operations carry only the opaque `credential_ref`; access and
+secret keys are never emitted into NetBox.

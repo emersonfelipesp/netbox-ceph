@@ -1,13 +1,13 @@
 """DRF viewsets for the netbox-ceph plugin API.
 
-All resources are read-only in v1: HTTP methods are restricted to GET/HEAD/OPTIONS.
+Inventory resources are read-only. The ``CephOperation`` and ``CephProvider``
+viewsets expose write-action endpoints (``plan``/``apply``/``reconcile``) that
+delegate to ``netbox_ceph.services.operation_actions`` — the same service the
+web action views use, so the REST API and the UI share one implementation.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
-from django.utils import timezone
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import status
 from rest_framework.decorators import action
@@ -15,11 +15,6 @@ from rest_framework.response import Response
 
 from netbox_ceph import filtersets
 from netbox_ceph.api import serializers
-from netbox_ceph.choices import (
-    CephOperationStatusChoices,
-    CephPlanStatusChoices,
-    CephValidationSeverityChoices,
-)
 from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
@@ -46,15 +41,22 @@ from netbox_ceph.models import (
     CephRGWZoneDesiredState,
     CephValidationResult,
 )
-from netbox_ceph.services import ceph_v2_responses
-from netbox_ceph.services.http_client import CephBackendError
-from netbox_ceph.services.orchestrator import (
-    CephOrchestratorClient,
-    CephOrchestratorUnavailable,
-    CephOrchestratorUnsupported,
+from netbox_ceph.services.operation_actions import (
+    OperationActionError,
+    apply_operation,
+    plan_operation,
+    reconcile_provider,
 )
 
 _READ_ONLY_HTTP_METHODS = ("get", "head", "options")
+
+# OperationActionError.kind -> HTTP status for action endpoints.
+_ERROR_STATUS = {
+    "invalid": status.HTTP_400_BAD_REQUEST,
+    "unsupported": status.HTTP_409_CONFLICT,
+    "unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "backend": status.HTTP_502_BAD_GATEWAY,
+}
 
 
 def _authenticated_user(request):
@@ -64,105 +66,24 @@ def _authenticated_user(request):
     return None
 
 
-def _operation_payload(operation: CephOperation) -> dict[str, Any]:
-    provider = operation.provider
-    return {
-        "id": operation.pk,
-        "cluster_id": operation.cluster_id,
-        "provider_id": operation.provider_id,
-        "provider_kind": provider.kind if provider is not None else None,
-        "provider_name": provider.name if provider is not None else None,
-        "operation_type": operation.operation_type,
-        "target_kind": operation.target_kind,
-        "target_ref": operation.target_ref,
-        "desired": operation.desired,
-        "is_destructive": operation.is_destructive,
-        "confirmation_required": operation.confirmation_required,
-        "confirmed": operation.confirmed,
-        "source_branch_schema_id": operation.source_branch_schema_id,
-    }
+def _action_error_response(viewset, exc: OperationActionError) -> Response:
+    """Translate an ``OperationActionError`` into a DRF ``Response``.
 
+    When the failure produced a persisted run (orchestrator errors during
+    apply/reconcile) the run is serialized; otherwise a ``detail`` message is
+    returned. ``kind`` selects the HTTP status code.
+    """
 
-def _choice_or_default(value: Any, choices: list[tuple[str, str, str]], default: str) -> str:
-    allowed = {choice[0] for choice in choices}
-    if value in allowed:
-        return str(value)
-    return default
-
-
-def _plan_payload(response: dict[str, Any]) -> dict[str, Any]:
-    plan = response.get("plan")
-    if isinstance(plan, dict):
-        return plan
-    return response
-
-
-def _validation_payloads(response: dict[str, Any], plan_payload: dict[str, Any]) -> list[dict[str, Any]]:
-    candidates = response.get("validations", plan_payload.get("validations", []))
-    if not isinstance(candidates, list):
-        return []
-    return [item for item in candidates if isinstance(item, dict)]
-
-
-def _latest_plan(operation: CephOperation) -> CephPlan | None:
-    return operation.plans.order_by("-generated_at", "-created", "-pk").first()
-
-
-def _plan_status_from_response(payload: dict[str, Any]) -> str:
-    valid_choices = {choice[0] for choice in CephPlanStatusChoices.CHOICES}
-    status_value = ceph_v2_responses.plan_status_value(payload, valid_choices=valid_choices)
-    if status_value in valid_choices:
-        return str(status_value)
-    return CephPlanStatusChoices.STATUS_DRAFT
-
-
-def _refresh_plan(
-    operation: CephOperation,
-    response_payload: dict[str, Any],
-) -> tuple[CephPlan, list[CephValidationResult]]:
-    payload = _plan_payload(response_payload)
-    fields = ceph_v2_responses.plan_fields_from_response(payload)
-    plan = _latest_plan(operation) or CephPlan(operation=operation)
-    plan.status = _plan_status_from_response(payload)
-    plan.summary = fields["summary"]
-    plan.intended_changes = fields["intended_changes"]
-    plan.provider_target = fields["provider_target"]
-    plan.blast_radius = fields["blast_radius"]
-    plan.expected_tasks = fields["expected_tasks"]
-    plan.rollback_limits = str(payload.get("rollback_limits", ""))
-    plan.is_destructive = bool(fields["is_destructive"] or operation.is_destructive)
-    plan.generated_at = timezone.now()
-    plan.raw = response_payload
-    plan.save()
-
-    plan.validations.all().delete()
-    validations: list[CephValidationResult] = []
-    for item in _validation_payloads(response_payload, payload):
-        validation = CephValidationResult.objects.create(
-            plan=plan,
-            operation=operation,
-            severity=_choice_or_default(
-                item.get("severity"),
-                CephValidationSeverityChoices.CHOICES,
-                CephValidationSeverityChoices.SEVERITY_INFO,
-            ),
-            code=str(item.get("code", "backend")),
-            message=str(item.get("message", "")),
-            target=str(item.get("target", "")),
+    resp_status = _ERROR_STATUS.get(exc.kind, status.HTTP_502_BAD_GATEWAY)
+    if exc.run is not None:
+        return Response(
+            serializers.CephOperationRunSerializer(
+                exc.run,
+                context=viewset.get_serializer_context(),
+            ).data,
+            status=resp_status,
         )
-        validations.append(validation)
-    return plan, validations
-
-
-def _run_status(value: Any, default: str) -> str:
-    mapped = ceph_v2_responses.map_run_status(value)
-    if mapped is not None:
-        return mapped
-    return _choice_or_default(value, CephOperationStatusChoices.CHOICES, default)
-
-
-def _provider_task_ref(response: dict[str, Any]) -> str:
-    return ceph_v2_responses.provider_task_ref(response)
+    return Response({"detail": exc.message}, status=resp_status)
 
 
 class CephPluginSettingsViewSet(NetBoxModelViewSet):
@@ -231,6 +152,27 @@ class CephProviderViewSet(NetBoxModelViewSet):
     serializer_class = serializers.CephProviderSerializer
     filterset_class = filtersets.CephProviderFilterSet
 
+    @action(detail=True, methods=["post"])
+    def reconcile(self, request, pk=None):
+        provider = self.get_object()
+        scope = request.data.get("scope") if isinstance(request.data, dict) else None
+        if not isinstance(scope, dict):
+            scope = None
+        try:
+            run = reconcile_provider(
+                provider,
+                actor=_authenticated_user(request),
+                scope=scope,
+            )
+        except OperationActionError as exc:
+            return _action_error_response(self, exc)
+        return Response(
+            serializers.CephOperationRunSerializer(
+                run,
+                context=self.get_serializer_context(),
+            ).data
+        )
+
 
 class CephOperationViewSet(NetBoxModelViewSet):
     queryset = CephOperation.objects.select_related(
@@ -245,30 +187,13 @@ class CephOperationViewSet(NetBoxModelViewSet):
     @action(detail=True, methods=["post"])
     def plan(self, request, pk=None):
         operation = self.get_object()
-        operation.status = CephOperationStatusChoices.STATUS_PLANNING
-        if operation.requested_by_id is None:
-            operation.requested_by = _authenticated_user(request)
-        operation.save(update_fields=("status", "requested_by", "last_updated"))
-
-        orchestrator = CephOrchestratorClient()
         try:
-            response_payload = orchestrator.plan(_operation_payload(operation))
-        except CephOrchestratorUnsupported as exc:
-            operation.status = CephOperationStatusChoices.STATUS_UNSUPPORTED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
-        except CephOrchestratorUnavailable as exc:
-            operation.status = CephOperationStatusChoices.STATUS_FAILED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        except CephBackendError as exc:
-            operation.status = CephOperationStatusChoices.STATUS_FAILED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-        plan, validations = _refresh_plan(operation, response_payload)
-        operation.status = CephOperationStatusChoices.STATUS_PLANNED
-        operation.save(update_fields=("status", "last_updated"))
+            plan, validations = plan_operation(
+                operation,
+                requested_by=_authenticated_user(request),
+            )
+        except OperationActionError as exc:
+            return _action_error_response(self, exc)
         return Response(
             {
                 "plan": serializers.CephPlanSerializer(
@@ -286,126 +211,15 @@ class CephOperationViewSet(NetBoxModelViewSet):
     @action(detail=True, methods=["post"])
     def apply(self, request, pk=None):
         operation = self.get_object()
-        if operation.status != CephOperationStatusChoices.STATUS_PLANNED:
-            return Response(
-                {"detail": "Operation must be in planned status before apply."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        plan = _latest_plan(operation)
-        if plan is None:
-            return Response(
-                {"detail": "Operation has no generated plan to apply."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = _authenticated_user(request)
-        if request.data.get("confirmed") is True and not operation.confirmed:
-            operation.confirmed = True
-            operation.confirmed_by = user
-            operation.confirmed_at = timezone.now()
-            operation.save(
-                update_fields=("confirmed", "confirmed_by", "confirmed_at", "last_updated")
-            )
-
-        if (operation.is_destructive or operation.confirmation_required) and not operation.confirmed:
-            return Response(
-                {"detail": "Destructive or confirmation-required operations need confirmed=True."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        started_at = timezone.now()
-        run = CephOperationRun.objects.create(
-            operation=operation,
-            plan=plan,
-            provider=operation.provider,
-            status=CephOperationStatusChoices.STATUS_APPLYING,
-            actor=user,
-            source_branch_schema_id=operation.source_branch_schema_id,
-            started_at=started_at,
-        )
-        operation.status = CephOperationStatusChoices.STATUS_APPLYING
-        operation.save(update_fields=("status", "last_updated"))
-
-        payload = {
-            **_operation_payload(operation),
-            "plan_id": plan.pk,
-            "plan": plan.raw,
-        }
-        orchestrator = CephOrchestratorClient()
+        confirmed = bool(getattr(request, "data", {}).get("confirmed") is True)
         try:
-            response_payload = orchestrator.apply(payload)
-        except CephOrchestratorUnsupported as exc:
-            run.status = CephOperationStatusChoices.STATUS_UNSUPPORTED
-            run.finished_at = timezone.now()
-            run.error = str(exc)
-            run.save(update_fields=("status", "finished_at", "error", "last_updated"))
-            operation.status = CephOperationStatusChoices.STATUS_UNSUPPORTED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response(
-                serializers.CephOperationRunSerializer(
-                    run,
-                    context=self.get_serializer_context(),
-                ).data,
-                status=status.HTTP_409_CONFLICT,
+            run = apply_operation(
+                operation,
+                actor=_authenticated_user(request),
+                confirmed=confirmed,
             )
-        except CephOrchestratorUnavailable as exc:
-            run.status = CephOperationStatusChoices.STATUS_FAILED
-            run.finished_at = timezone.now()
-            run.error = str(exc)
-            run.save(update_fields=("status", "finished_at", "error", "last_updated"))
-            operation.status = CephOperationStatusChoices.STATUS_FAILED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response(
-                serializers.CephOperationRunSerializer(
-                    run,
-                    context=self.get_serializer_context(),
-                ).data,
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        except CephBackendError as exc:
-            run.status = CephOperationStatusChoices.STATUS_FAILED
-            run.finished_at = timezone.now()
-            run.error = str(exc)
-            run.save(update_fields=("status", "finished_at", "error", "last_updated"))
-            operation.status = CephOperationStatusChoices.STATUS_FAILED
-            operation.save(update_fields=("status", "last_updated"))
-            return Response(
-                serializers.CephOperationRunSerializer(
-                    run,
-                    context=self.get_serializer_context(),
-                ).data,
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
-        run.status = _run_status(
-            response_payload.get("status"),
-            CephOperationStatusChoices.STATUS_SUCCEEDED,
-        )
-        run.provider_task_ref = _provider_task_ref(response_payload)
-        run.finished_at = timezone.now()
-        run.result = response_payload
-        warnings = response_payload.get("warnings", [])
-        run.warnings = warnings if isinstance(warnings, list) else [str(warnings)]
-        errors = response_payload.get("errors", [])
-        if isinstance(errors, list) and errors:
-            run.error = "; ".join(str(item) for item in errors if item)
-        run.save(
-            update_fields=(
-                "status",
-                "provider_task_ref",
-                "finished_at",
-                "result",
-                "warnings",
-                "error",
-                "last_updated",
-            )
-        )
-        operation.status = run.status
-        operation.save(update_fields=("status", "last_updated"))
-        if run.status == CephOperationStatusChoices.STATUS_SUCCEEDED:
-            plan.status = CephPlanStatusChoices.STATUS_APPLIED
-            plan.save(update_fields=("status", "last_updated"))
+        except OperationActionError as exc:
+            return _action_error_response(self, exc)
         return Response(
             serializers.CephOperationRunSerializer(
                 run,

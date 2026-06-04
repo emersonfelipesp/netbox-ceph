@@ -207,3 +207,49 @@ from the NetBox `CephPlan`/`CephOperationRun` models, so
 backend response is always retained in `CephPlan.raw` / `CephOperationRun.result`.
 When proxbox-api response schemas change, update this mapper (and its tests), not
 the view handlers.
+
+## Declarative → Imperative: Operation Actions And The Desired-State Bridge
+
+The declarative desired-state models and the imperative
+`CephOperation` → `CephPlan` → `CephOperationRun` engine are wired together by two
+service modules, both consumed by the REST API (`netbox_ceph/api/views.py`) and
+the NetBox web action views (`netbox_ceph/views.py`) so REST and UI share one
+implementation:
+
+- `netbox_ceph/services/operation_actions.py` — owns the orchestrator call plus
+  persistence/status transitions for `plan_operation()`, `apply_operation()`, and
+  provider `reconcile_provider()`. Failures raise a typed `OperationActionError`
+  (`kind` in `invalid`/`unsupported`/`unavailable`/`backend`); the API maps
+  `kind` → HTTP status (400/409/503/502), the UI maps it to a flash message. The
+  shared response-mapping helpers (`operation_payload`, `refresh_plan`,
+  `run_status`, `provider_task_ref`) live here, not in the view layer.
+- `netbox_ceph/services/desired_state_operations.py` — turns a desired-state row
+  into a `CephOperation`. The payload/target builders (`build_request`, `_clean`,
+  the per-kind `*_payload`/`*_ref` functions) are **Django-free** so they unit
+  test without a NetBox runtime (`tests/test_desired_state_operations.py`, the
+  plain-pytest CI layer). `build_operation(instance)` is the thin Django wrapper.
+  Generated operations use `operation_type=reconcile` and `is_destructive=False`:
+  the proxbox-api Proxmox adapter `diff()` treats any non-delete action as
+  "ensure" and resolves create/update/noop from live state, so a generated
+  reconcile is never destructive. Kind mapping: pool→`pool`,
+  filesystem→`filesystem`, rbd_image→`rbd_image` (`pool/name`),
+  rbd_snapshot→`rbd_snapshot` (`pool/image@snap`),
+  rgw_{realm,zone,user,bucket}→`rgw_*`. RGW users carry only the opaque
+  `credential_ref` — never access/secret keys.
+
+### UI surface
+
+- **Operation detail** (`templates/netbox_ceph/cephoperation.html`): **Plan** and
+  **Apply** buttons. Apply shows only when the operation is `planned`; destructive
+  or confirmation-required operations route through a Bootstrap confirm modal that
+  posts `confirmed=true`.
+- **Provider detail** (`cephprovider.html`): **Reconcile** button → records a
+  provider-scoped operation + run from `/ceph/v2/reconcile`.
+- **Desired-state detail** (all 8 models): **Generate operation** button →
+  `build_operation` → redirect to the new operation. The shared partial
+  `templates/netbox_ceph/inc/generate_operation_controls.html` resolves the URL
+  generically via the `viewname` filter.
+
+Action URLs are registered with `register_model_view` on models already listed in
+`urls.py::_MODEL_ROUTES`, so `get_model_urls` auto-includes them — no `urls.py`
+change is needed when adding a new action to an already-routed model.
