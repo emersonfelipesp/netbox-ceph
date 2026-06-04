@@ -37,47 +37,46 @@ See the plugin's code structure:
 
 ## Automatic Production Deployment
 
-**Starting with the deploy-production workflow**, new commits to `main` automatically deploy to `netbox.nmulti.cloud`.
+New commits to `main` automatically deploy to `netbox.nmulti.cloud`.
 
 **Deploy job in `.gitea/workflows/deploy-production.yml`:**
-- Triggers on `push: [main]` branch updates
-- Also supports manual dispatch via `workflow_dispatch` with optional `ref` input
-- Runs on `prod-deploy` runner with SSH access to production host
-- Executes: `ssh nmc-prod-207 -- deploy-plugin ceph "$REF"`
-
-**Deploy parameters:**
-- REF: can be a version tag (v0.1.0), branch name (main/develop), or 7+ character commit SHA
-- Default: uses current commit SHA if not specified in manual dispatch
+- Triggers on `push: [main]` and `workflow_dispatch` (optional `ref` input).
+- Runs on the `prod-deploy` runner, which executes **on the production host**.
+- Runs the local deploy script `/opt/nmulticloud/deploy/bin/deploy-netbox-plugin ceph "$REF"`
+  directly (mirroring the `deploy-app` pattern used by sibling services); it
+  falls back to `ssh nmc-prod-207 -- deploy-plugin ceph "$REF"` only when the
+  script is absent (runner not co-located with the target).
 
 **Security hardening:**
-- REF is passed via environment variable, not direct GitHub Actions context interpolation
-- Bash case statement validates ref format before SSH (whitelist: version tags, branch names, commit SHAs)
-- StrictHostKeyChecking=accept-new prevents MITM attacks
-- Quoted variable interpolation prevents shell injection
+- REF is passed via an environment variable, not direct context interpolation.
+- A bash `case` statement validates the ref format (version tags, `main`/`develop`,
+  7+ char commit SHAs) before use.
 
-**Deployment on production server (`nmc-prod-207`):**
-1. Git fetch/checkout of the specified ref in the plugin submodule
-2. pip install -e to refresh editable install and pick up new dependencies
-3. manage.py migrate to apply any pending migrations
-4. manage.py collectstatic to collect new/updated static files
-5. systemctl reload netbox-production (graceful gunicorn reload)
-6. systemctl restart netbox-rq (RQ worker restart for code changes)
-7. Health check: curl -sf http://127.0.0.1:18001/api/ to verify service is responding
+**What `deploy-netbox-plugin ceph <ref>` does** (on the prod host, as the runner):
+1. Discovers the plugin's live editable source directory from the running
+   interpreter (production loads plugins editable from the workspace checkout,
+   not `/opt/netbox/netbox/<plugin>`).
+2. Refuses to run if that checkout has uncommitted changes (never discards WIP).
+3. `git fetch` + checkout the ref (keeping the checkout on its branch) and
+   force-refreshes the editable install.
+4. **Safety gate:** `manage.py check` — on failure it rolls the source back and
+   aborts *without restarting*, so production keeps serving the previous code.
+5. `manage.py migrate --no-input` + `collectstatic --no-input`.
+6. `systemctl restart netbox.service`, then health-checks the WSGI backend at
+   `http://127.0.0.1:8001/api/`; an unhealthy backend rolls back and restarts.
 
-**Monitoring and verification:**
-- Watch the `deploy-production.yml` workflow run in Gitea Actions
-- Check the `deploy` job logs for SSH output and health check results
-- Verify production is healthy: `ssh nmc-prod-207 -- health netbox`
-- Check service logs: `ssh nmc-prod-207 -- logs netbox`
+**Monitoring:**
+- Watch the `deploy-production.yml` run in Gitea Actions (the `Deploy plugin` job).
+- Verify live: `curl -sS https://netbox.nmulti.cloud/api/plugins/ceph/` → `403`
+  (auth-gated, plugin loaded).
 
 **Manual deployment trigger:**
 ```bash
-# Deploy a specific tag or branch via workflow dispatch
-nms git actions run netbox-ceph .gitea/workflows/deploy-production.yml \
-  -r main -f ref=v0.1.0
+# Manual dispatch of the deploy workflow
+nms git actions run netbox-ceph .gitea/workflows/deploy-production.yml -r main -f ref=v0.1.0
 
-# Or SSH directly to production
-ssh nmc-prod-207 -- deploy-plugin ceph v0.1.0
+# Or directly on the production host
+/opt/nmulticloud/deploy/bin/deploy-netbox-plugin ceph v0.1.0
 ```
 
 For comprehensive deploy infrastructure documentation, see `/root/personal-context/nmulticloud-context/CLAUDE.md` section "Automatic Plugin Deployment to Production".
