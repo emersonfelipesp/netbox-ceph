@@ -1,0 +1,18 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+
+{% comment %}
+Adds a Reconcile control to the Ceph provider detail page. Reconcile pulls live
+provider state back into NetBox through proxbox-api and records an auditable run.
+{% endcomment %}
+
+{% block extra_controls %}
+  {% if perms.netbox_ceph.change_cephprovider %}
+    <form action="{% url 'plugins:netbox_ceph:cephprovider_reconcile' pk=object.pk %}" method="post" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="mdi mdi-sync"></i> Reconcile
+      </button>
+    </form>
+  {% endif %}
+{% endblock %}

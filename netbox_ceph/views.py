@@ -6,8 +6,9 @@ All inventory models are exposed as read-only object/list views in v1. Only
 
 from __future__ import annotations
 
+from django.contrib import messages
 from django.db.models import Count
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
 from netbox.views import generic
@@ -45,6 +46,29 @@ from netbox_ceph.models import (
     CephRGWZoneDesiredState,
     CephValidationResult,
 )
+from netbox_ceph.services.desired_state_operations import build_operation
+from netbox_ceph.services.operation_actions import (
+    OperationActionError,
+    apply_operation,
+    plan_operation,
+    reconcile_provider,
+)
+
+_DESIRED_STATE_MODELS = (
+    CephPoolDesiredState,
+    CephFilesystemDesiredState,
+    CephRBDImageDesiredState,
+    CephRBDSnapshotDesiredState,
+    CephRGWRealmDesiredState,
+    CephRGWZoneDesiredState,
+    CephRGWUserDesiredState,
+    CephRGWBucketDesiredState,
+)
+
+
+def _action_user(request):
+    user = getattr(request, "user", None)
+    return user if user is not None and user.is_authenticated else None
 
 
 class CephHomeView(generic.ObjectListView):
@@ -376,3 +400,94 @@ _register_writable(
     forms.CephRGWBucketDesiredStateFilterForm,
     forms.CephRGWBucketDesiredStateForm,
 )
+
+
+# ---------------------------------------------------------------------------
+# Ceph v2 action views (UI buttons -> operation_actions service)
+# ---------------------------------------------------------------------------
+
+
+class _PostActionView(ContentTypePermissionRequiredMixin, View):
+    """POST-only UI action that mutates a Ceph object, then redirects back.
+
+    Shares ``netbox_ceph.services.operation_actions`` with the REST API so the
+    button and the API endpoint behave identically. ``OperationActionError`` is
+    surfaced as a flash message rather than an HTTP error code.
+    """
+
+    http_method_names = ["post"]
+    model = None
+    permission = ""
+    action_label = "Action"
+
+    def get_required_permission(self) -> str:
+        return self.permission
+
+    def perform(self, request, obj) -> tuple[str, str]:
+        """Run the action; return (success message, redirect URL)."""
+
+        raise NotImplementedError
+
+    def post(self, request, *args, **kwargs):
+        obj = get_object_or_404(self.model, pk=kwargs["pk"])
+        try:
+            message, redirect_url = self.perform(request, obj)
+        except OperationActionError as exc:
+            messages.error(request, f"{self.action_label} failed: {exc.message}")
+            return redirect(obj.get_absolute_url())
+        messages.success(request, message)
+        return redirect(redirect_url)
+
+
+@register_model_view(CephOperation, "plan", path="plan")
+class CephOperationPlanView(_PostActionView):
+    model = CephOperation
+    permission = "netbox_ceph.change_cephoperation"
+    action_label = "Plan"
+
+    def perform(self, request, obj) -> tuple[str, str]:
+        plan_operation(obj, requested_by=_action_user(request))
+        return "Plan generated from the configured provider.", obj.get_absolute_url()
+
+
+@register_model_view(CephOperation, "apply", path="apply")
+class CephOperationApplyView(_PostActionView):
+    model = CephOperation
+    permission = "netbox_ceph.change_cephoperation"
+    action_label = "Apply"
+
+    def perform(self, request, obj) -> tuple[str, str]:
+        confirmed = request.POST.get("confirmed") in ("true", "True", "on", "1")
+        run = apply_operation(obj, actor=_action_user(request), confirmed=confirmed)
+        return f"Apply finished with status “{run.status}”.", obj.get_absolute_url()
+
+
+@register_model_view(CephProvider, "reconcile", path="reconcile")
+class CephProviderReconcileView(_PostActionView):
+    model = CephProvider
+    permission = "netbox_ceph.change_cephprovider"
+    action_label = "Reconcile"
+
+    def perform(self, request, obj) -> tuple[str, str]:
+        run = reconcile_provider(obj, actor=_action_user(request))
+        return f"Reconcile finished with status “{run.status}”.", run.get_absolute_url()
+
+
+class _GenerateOperationView(_PostActionView):
+    """Generate a CephOperation from a desired-state row, then open it."""
+
+    permission = "netbox_ceph.add_cephoperation"
+    action_label = "Generate operation"
+
+    def perform(self, request, obj) -> tuple[str, str]:
+        operation = build_operation(obj, requested_by=_action_user(request))
+        return "Operation generated from desired state.", operation.get_absolute_url()
+
+
+for _ds_model in _DESIRED_STATE_MODELS:
+    _view_cls = type(
+        f"{_ds_model.__name__}GenerateOperationView",
+        (_GenerateOperationView,),
+        {"model": _ds_model},
+    )
+    register_model_view(_ds_model, "generate_operation", path="generate-operation")(_view_cls)
