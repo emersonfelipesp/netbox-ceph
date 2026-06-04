@@ -46,6 +46,7 @@ from netbox_ceph.models import (
     CephRGWZoneDesiredState,
     CephValidationResult,
 )
+from netbox_ceph.services import ceph_v2_responses
 from netbox_ceph.services.http_client import CephBackendError
 from netbox_ceph.services.orchestrator import (
     CephOrchestratorClient,
@@ -107,24 +108,29 @@ def _latest_plan(operation: CephOperation) -> CephPlan | None:
     return operation.plans.order_by("-generated_at", "-created", "-pk").first()
 
 
+def _plan_status_from_response(payload: dict[str, Any]) -> str:
+    valid_choices = {choice[0] for choice in CephPlanStatusChoices.CHOICES}
+    status_value = ceph_v2_responses.plan_status_value(payload, valid_choices=valid_choices)
+    if status_value in valid_choices:
+        return str(status_value)
+    return CephPlanStatusChoices.STATUS_DRAFT
+
+
 def _refresh_plan(
     operation: CephOperation,
     response_payload: dict[str, Any],
 ) -> tuple[CephPlan, list[CephValidationResult]]:
     payload = _plan_payload(response_payload)
+    fields = ceph_v2_responses.plan_fields_from_response(payload)
     plan = _latest_plan(operation) or CephPlan(operation=operation)
-    plan.status = _choice_or_default(
-        payload.get("status"),
-        CephPlanStatusChoices.CHOICES,
-        CephPlanStatusChoices.STATUS_DRAFT,
-    )
-    plan.summary = str(payload.get("summary", ""))
-    plan.intended_changes = payload.get("intended_changes", [])
-    plan.provider_target = str(payload.get("provider_target", ""))
-    plan.blast_radius = payload.get("blast_radius", {})
-    plan.expected_tasks = payload.get("expected_tasks", [])
+    plan.status = _plan_status_from_response(payload)
+    plan.summary = fields["summary"]
+    plan.intended_changes = fields["intended_changes"]
+    plan.provider_target = fields["provider_target"]
+    plan.blast_radius = fields["blast_radius"]
+    plan.expected_tasks = fields["expected_tasks"]
     plan.rollback_limits = str(payload.get("rollback_limits", ""))
-    plan.is_destructive = bool(payload.get("is_destructive", operation.is_destructive))
+    plan.is_destructive = bool(fields["is_destructive"] or operation.is_destructive)
     plan.generated_at = timezone.now()
     plan.raw = response_payload
     plan.save()
@@ -149,9 +155,14 @@ def _refresh_plan(
 
 
 def _run_status(value: Any, default: str) -> str:
-    if value == "ok":
-        return CephOperationStatusChoices.STATUS_SUCCEEDED
+    mapped = ceph_v2_responses.map_run_status(value)
+    if mapped is not None:
+        return mapped
     return _choice_or_default(value, CephOperationStatusChoices.CHOICES, default)
+
+
+def _provider_task_ref(response: dict[str, Any]) -> str:
+    return ceph_v2_responses.provider_task_ref(response)
 
 
 class CephPluginSettingsViewSet(NetBoxModelViewSet):
@@ -371,13 +382,14 @@ class CephOperationViewSet(NetBoxModelViewSet):
             response_payload.get("status"),
             CephOperationStatusChoices.STATUS_SUCCEEDED,
         )
-        run.provider_task_ref = str(
-            response_payload.get("provider_task_ref") or response_payload.get("task_ref") or ""
-        )
+        run.provider_task_ref = _provider_task_ref(response_payload)
         run.finished_at = timezone.now()
         run.result = response_payload
         warnings = response_payload.get("warnings", [])
         run.warnings = warnings if isinstance(warnings, list) else [str(warnings)]
+        errors = response_payload.get("errors", [])
+        if isinstance(errors, list) and errors:
+            run.error = "; ".join(str(item) for item in errors if item)
         run.save(
             update_fields=(
                 "status",
@@ -385,6 +397,7 @@ class CephOperationViewSet(NetBoxModelViewSet):
                 "finished_at",
                 "result",
                 "warnings",
+                "error",
                 "last_updated",
             )
         )

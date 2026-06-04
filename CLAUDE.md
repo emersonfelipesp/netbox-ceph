@@ -183,3 +183,27 @@ become `CephOrchestratorUnavailable`.
 
 Unsupported operations fail clearly. Do not add shell command fallbacks or local
 Ceph CLI execution paths.
+
+## Orchestrator Response Mapping
+
+proxbox-api (#95) returns `PlanResponse`/`OperationRun` with `operations`,
+`blocked_actions`, `warnings`, `live_state_summary`, `provider_task_refs` (a
+**list** of Proxmox UPIDs), and `status` in
+`completed`/`running`/`failed`/`blocked`/`cancelled`. These field names differ
+from the NetBox `CephPlan`/`CephOperationRun` models, so
+`netbox_ceph/services/ceph_v2_responses.py` (pure, Django-free, unit-tested in
+`tests/test_v2_response_mapping.py`) translates them:
+
+- `map_run_status()` — proxbox status → `CephOperationStatusChoices`
+  (`completed`→`succeeded`, `running`→`applying`, `blocked`→`failed`, …).
+- `provider_task_ref()` — joins `provider_task_refs` (list) into the singular
+  `CephOperationRun.provider_task_ref`, with back-compat for singular keys.
+- `plan_fields_from_response()` — derives `intended_changes`/`expected_tasks`/
+  `summary`/`is_destructive`/`blast_radius`/`provider_target` from `operations`/
+  `blocked_actions`/`warnings`/`live_state_summary`, preferring explicit legacy
+  fields when present.
+
+`netbox_ceph/api/views.py` wraps these with the `ChoiceSet` validation. The full
+backend response is always retained in `CephPlan.raw` / `CephOperationRun.result`.
+When proxbox-api response schemas change, update this mapper (and its tests), not
+the view handlers.
