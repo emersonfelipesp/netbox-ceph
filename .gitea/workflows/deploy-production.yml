@@ -35,5 +35,5 @@ jobs:
             ssh -o StrictHostKeyChecking=accept-new \
                 -o ServerAliveInterval=30 \
                 -o ServerAliveCountMax=20 \
-                nmc-prod-207 -- deploy-plugin ceph "$REF"
+                nmc-prod-207 -- deploy-plugin netbox-ceph "$REF"
           fi
