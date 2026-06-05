@@ -38,12 +38,21 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 from netbox_ceph.services.desired_state_operations import build_operation
@@ -292,6 +301,60 @@ _register_readonly(
     tables.CephHealthCheckTable,
     filtersets.CephHealthCheckFilterSet,
     forms.CephHealthCheckFilterForm,
+)
+_register_readonly(
+    CephRGWRealm,
+    tables.CephRGWRealmTable,
+    filtersets.CephRGWRealmFilterSet,
+    forms.CephRGWRealmFilterForm,
+)
+_register_readonly(
+    CephRGWZoneGroup,
+    tables.CephRGWZoneGroupTable,
+    filtersets.CephRGWZoneGroupFilterSet,
+    forms.CephRGWZoneGroupFilterForm,
+)
+_register_readonly(
+    CephRGWZone,
+    tables.CephRGWZoneTable,
+    filtersets.CephRGWZoneFilterSet,
+    forms.CephRGWZoneFilterForm,
+)
+_register_readonly(
+    CephRGWPlacementTarget,
+    tables.CephRGWPlacementTargetTable,
+    filtersets.CephRGWPlacementTargetFilterSet,
+    forms.CephRGWPlacementTargetFilterForm,
+)
+_register_readonly(
+    CephRGWUserReflected,
+    tables.CephRGWUserReflectedTable,
+    filtersets.CephRGWUserReflectedFilterSet,
+    forms.CephRGWUserReflectedFilterForm,
+)
+_register_readonly(
+    CephRGWBucketReflected,
+    tables.CephRGWBucketReflectedTable,
+    filtersets.CephRGWBucketReflectedFilterSet,
+    forms.CephRGWBucketReflectedFilterForm,
+)
+_register_readonly(
+    CephRBDImage,
+    tables.CephRBDImageTable,
+    filtersets.CephRBDImageFilterSet,
+    forms.CephRBDImageFilterForm,
+)
+_register_readonly(
+    CephRBDSnapshot,
+    tables.CephRBDSnapshotTable,
+    filtersets.CephRBDSnapshotFilterSet,
+    forms.CephRBDSnapshotFilterForm,
+)
+_register_readonly(
+    CephRBDClone,
+    tables.CephRBDCloneTable,
+    filtersets.CephRBDCloneFilterSet,
+    forms.CephRBDCloneFilterForm,
 )
 _register_writable(
     CephProvider,

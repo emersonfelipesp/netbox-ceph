@@ -66,6 +66,25 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
         ],
     ),
     (
+        "RGW Inventory",
+        [
+            ("rgw-realms-list", "/plugins/ceph/rgw-realms/"),
+            ("rgw-zone-groups-list", "/plugins/ceph/rgw-zone-groups/"),
+            ("rgw-zones-list", "/plugins/ceph/rgw-zones/"),
+            ("rgw-placement-targets-list", "/plugins/ceph/rgw-placement-targets/"),
+            ("rgw-users-list", "/plugins/ceph/rgw-users/"),
+            ("rgw-buckets-list", "/plugins/ceph/rgw-buckets/"),
+        ],
+    ),
+    (
+        "RBD Inventory",
+        [
+            ("rbd-images-list", "/plugins/ceph/rbd-images/"),
+            ("rbd-snapshots-list", "/plugins/ceph/rbd-snapshots/"),
+            ("rbd-clones-list", "/plugins/ceph/rbd-clones/"),
+        ],
+    ),
+    (
         "Ceph v2",
         [
             ("providers-list", "/plugins/ceph/providers/"),
@@ -122,6 +141,15 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
 # /plugins/ceph/crush-rules/{pk}/
 # /plugins/ceph/flags/{pk}/
 # /plugins/ceph/health-checks/{pk}/
+# /plugins/ceph/rgw-realms/{pk}/
+# /plugins/ceph/rgw-zone-groups/{pk}/
+# /plugins/ceph/rgw-zones/{pk}/
+# /plugins/ceph/rgw-placement-targets/{pk}/
+# /plugins/ceph/rgw-users/{pk}/
+# /plugins/ceph/rgw-buckets/{pk}/
+# /plugins/ceph/rbd-images/{pk}/
+# /plugins/ceph/rbd-snapshots/{pk}/
+# /plugins/ceph/rbd-clones/{pk}/
 # /plugins/ceph/settings/{pk}/
 # /plugins/ceph/settings/{pk}/edit/
 # /plugins/ceph/providers/{pk}/

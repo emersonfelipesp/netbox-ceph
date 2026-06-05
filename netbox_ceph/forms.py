@@ -30,12 +30,21 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 
@@ -114,6 +123,82 @@ class CephHealthCheckFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
     name = forms.CharField(required=False)
     severity = forms.CharField(required=False)
     source = forms.CharField(required=False)
+
+
+class CephRGWRealmFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWRealm
+    name = forms.CharField(required=False)
+    is_default = forms.NullBooleanField(required=False)
+
+
+class CephRGWZoneGroupFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWZoneGroup
+    realm = DynamicModelChoiceField(queryset=CephRGWRealm.objects.all(), required=False)
+    name = forms.CharField(required=False)
+    is_master = forms.NullBooleanField(required=False)
+
+
+class CephRGWZoneFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWZone
+    zonegroup = DynamicModelChoiceField(
+        queryset=CephRGWZoneGroup.objects.all(), required=False
+    )
+    name = forms.CharField(required=False)
+
+
+class CephRGWPlacementTargetFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWPlacementTarget
+    zonegroup = DynamicModelChoiceField(
+        queryset=CephRGWZoneGroup.objects.all(), required=False
+    )
+    zone = DynamicModelChoiceField(queryset=CephRGWZone.objects.all(), required=False)
+    name = forms.CharField(required=False)
+
+
+class CephRGWUserReflectedFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWUserReflected
+    uid = forms.CharField(required=False)
+    display_name = forms.CharField(required=False)
+    email = forms.CharField(required=False)
+    tenant = forms.CharField(required=False)
+    suspended = forms.NullBooleanField(required=False)
+    max_buckets = forms.IntegerField(required=False)
+
+
+class CephRGWBucketReflectedFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRGWBucketReflected
+    name = forms.CharField(required=False)
+    owner_uid = forms.CharField(required=False)
+    tenant = forms.CharField(required=False)
+    placement_rule = forms.CharField(required=False)
+    versioning = forms.CharField(required=False)
+
+
+class CephRBDImageFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRBDImage
+    pool_name = forms.CharField(required=False)
+    name = forms.CharField(required=False)
+    namespace = forms.CharField(required=False)
+    image_id = forms.CharField(required=False)
+    data_pool = forms.CharField(required=False)
+
+
+class CephRBDSnapshotFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRBDSnapshot
+    image = DynamicModelChoiceField(queryset=CephRBDImage.objects.all(), required=False)
+    name = forms.CharField(required=False)
+    snap_id = forms.IntegerField(required=False)
+    protected = forms.NullBooleanField(required=False)
+
+
+class CephRBDCloneFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
+    model = CephRBDClone
+    parent_image = DynamicModelChoiceField(queryset=CephRBDImage.objects.all(), required=False)
+    parent_snapshot = DynamicModelChoiceField(
+        queryset=CephRBDSnapshot.objects.all(), required=False
+    )
+    child_pool_name = forms.CharField(required=False)
+    child_name = forms.CharField(required=False)
 
 
 class CephProviderForm(NetBoxModelForm):

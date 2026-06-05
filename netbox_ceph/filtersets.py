@@ -26,12 +26,21 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 
@@ -39,10 +48,15 @@ from netbox_ceph.models import (
 class _EndpointSearchMixin:
     """Shared free-text search across name/endpoint name."""
 
+    search_fields: tuple[str, ...] = ("name",)
+
     def search(self, queryset, name, value):
         if not value:
             return queryset
-        return queryset.filter(Q(name__icontains=value) | Q(endpoint__name__icontains=value))
+        query = Q(endpoint__name__icontains=value)
+        for field in self.search_fields:
+            query |= Q(**{f"{field}__icontains": value})
+        return queryset.filter(query)
 
 
 class _ClusterSearchMixin:
@@ -130,6 +144,116 @@ class CephHealthCheckFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
     class Meta:
         model = CephHealthCheck
         fields = ("id", "endpoint", "cluster", "name", "severity", "source")
+
+
+class CephRGWRealmFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    class Meta:
+        model = CephRGWRealm
+        fields = ("id", "endpoint", "cluster", "name", "is_default")
+
+
+class CephRGWZoneGroupFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "realm__name")
+
+    class Meta:
+        model = CephRGWZoneGroup
+        fields = ("id", "endpoint", "cluster", "realm", "name", "is_master")
+
+
+class CephRGWZoneFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "zonegroup__name")
+
+    class Meta:
+        model = CephRGWZone
+        fields = ("id", "endpoint", "cluster", "zonegroup", "name")
+
+
+class CephRGWPlacementTargetFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "zonegroup__name", "zone__name")
+
+    class Meta:
+        model = CephRGWPlacementTarget
+        fields = ("id", "endpoint", "cluster", "zonegroup", "zone", "name")
+
+
+class CephRGWUserReflectedFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("uid", "display_name", "email", "tenant")
+
+    class Meta:
+        model = CephRGWUserReflected
+        fields = (
+            "id",
+            "endpoint",
+            "cluster",
+            "uid",
+            "tenant",
+            "email",
+            "suspended",
+            "max_buckets",
+        )
+
+
+class CephRGWBucketReflectedFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "owner_uid", "tenant", "placement_rule")
+
+    class Meta:
+        model = CephRGWBucketReflected
+        fields = (
+            "id",
+            "endpoint",
+            "cluster",
+            "name",
+            "owner_uid",
+            "tenant",
+            "placement_rule",
+            "versioning",
+        )
+
+
+class CephRBDImageFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "pool_name", "namespace", "image_id", "data_pool")
+
+    class Meta:
+        model = CephRBDImage
+        fields = (
+            "id",
+            "endpoint",
+            "cluster",
+            "pool_name",
+            "name",
+            "namespace",
+            "image_id",
+            "data_pool",
+        )
+
+
+class CephRBDSnapshotFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = ("name", "image__name", "image__pool_name")
+
+    class Meta:
+        model = CephRBDSnapshot
+        fields = ("id", "endpoint", "cluster", "image", "name", "snap_id", "protected")
+
+
+class CephRBDCloneFilterSet(_EndpointSearchMixin, NetBoxModelFilterSet):
+    search_fields = (
+        "child_pool_name",
+        "child_name",
+        "parent_image__name",
+        "parent_snapshot__name",
+    )
+
+    class Meta:
+        model = CephRBDClone
+        fields = (
+            "id",
+            "endpoint",
+            "cluster",
+            "parent_image",
+            "parent_snapshot",
+            "child_pool_name",
+            "child_name",
+        )
 
 
 class CephProviderFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):

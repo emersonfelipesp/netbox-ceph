@@ -5,7 +5,7 @@ plain JSON GETs (see ``proxbox_api/ceph/routes.py``):
 
 - ``GET /ceph/status``
 - ``GET /ceph/sync/full``
-- ``GET /ceph/sync/{status,daemons,osds,pools,filesystems,crush,flags}``
+- ``GET /ceph/sync/{status,daemons,osds,pools,filesystems,crush,flags,rgw,rbd}``
 
 Every ``/ceph/sync/*`` route accepts an optional ``netbox_branch_schema_id``
 query parameter so the NetBox branching plugin can keep a single
@@ -35,6 +35,8 @@ CEPH_SYNC_RESOURCES: tuple[str, ...] = (
     "filesystems",
     "crush",
     "flags",
+    "rgw",
+    "rbd",
     "full",
 )
 
