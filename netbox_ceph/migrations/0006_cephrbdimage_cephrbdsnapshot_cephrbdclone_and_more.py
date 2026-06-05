@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('extras', '0138_customfieldchoiceset_choice_colors'),
         ('netbox_ceph', '0005_cephrgwrealmdesiredstate_cephrgwuserdesiredstate_and_more'),
-        ('netbox_proxbox', '0049_alter_proxboxpluginsettings_interface_batch_size_and_more'),
+        ('netbox_proxbox', '0004_fastapiendpoint_netboxendpoint_proxmoxendpoint_and_more'),
     ]
 
     operations = [
