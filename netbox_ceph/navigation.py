@@ -127,6 +127,51 @@ _inventory_items = (
         permissions=["netbox_ceph.view_cephhealthcheck"],
     ),
     PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwrealm_list",
+        link_text="RGW Realms",
+        permissions=["netbox_ceph.view_cephrgwrealm"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwzonegroup_list",
+        link_text="RGW Zone Groups",
+        permissions=["netbox_ceph.view_cephrgwzonegroup"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwzone_list",
+        link_text="RGW Zones",
+        permissions=["netbox_ceph.view_cephrgwzone"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwplacementtarget_list",
+        link_text="RGW Placement Targets",
+        permissions=["netbox_ceph.view_cephrgwplacementtarget"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwuserreflected_list",
+        link_text="RGW Users",
+        permissions=["netbox_ceph.view_cephrgwuserreflected"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrgwbucketreflected_list",
+        link_text="RGW Buckets",
+        permissions=["netbox_ceph.view_cephrgwbucketreflected"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrbdimage_list",
+        link_text="RBD Images",
+        permissions=["netbox_ceph.view_cephrbdimage"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrbdsnapshot_list",
+        link_text="RBD Snapshots",
+        permissions=["netbox_ceph.view_cephrbdsnapshot"],
+    ),
+    PluginMenuItem(
+        link="plugins:netbox_ceph:cephrbdclone_list",
+        link_text="RBD Clones",
+        permissions=["netbox_ceph.view_cephrbdclone"],
+    ),
+    PluginMenuItem(
         link="plugins:netbox_ceph:cephpluginsettings_singleton_edit",
         link_text="Plugin Settings",
         permissions=["netbox_ceph.change_cephpluginsettings"],

@@ -453,3 +453,426 @@ class CephHealthCheck(NetBoxModel):
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ceph:cephhealthcheck", args=[self.pk])
+
+
+class CephRGWRealm(NetBoxModel):
+    """RGW realm reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_realms",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_realms",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    is_default = models.BooleanField(default=False)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "name")
+        verbose_name = _("Ceph RGW realm")
+        verbose_name_plural = _("Ceph RGW realms")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "name"),
+                name="netbox_ceph_rgw_realm_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwrealm", args=[self.pk])
+
+
+class CephRGWZoneGroup(NetBoxModel):
+    """RGW zonegroup reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_zonegroups",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_zonegroups",
+        null=True,
+        blank=True,
+    )
+    realm = models.ForeignKey(
+        to="netbox_ceph.CephRGWRealm",
+        on_delete=models.SET_NULL,
+        related_name="zonegroups",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    is_master = models.BooleanField(default=False)
+    endpoints = models.JSONField(blank=True, default=list, encoder=CustomFieldJSONEncoder)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "name")
+        verbose_name = _("Ceph RGW zone group")
+        verbose_name_plural = _("Ceph RGW zone groups")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "name"),
+                name="netbox_ceph_rgw_zone_group_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwzonegroup", args=[self.pk])
+
+
+class CephRGWZone(NetBoxModel):
+    """RGW zone reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_zones",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_zones",
+        null=True,
+        blank=True,
+    )
+    zonegroup = models.ForeignKey(
+        to="netbox_ceph.CephRGWZoneGroup",
+        on_delete=models.SET_NULL,
+        related_name="zones",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    endpoints = models.JSONField(blank=True, default=list, encoder=CustomFieldJSONEncoder)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "name")
+        verbose_name = _("Ceph RGW zone")
+        verbose_name_plural = _("Ceph RGW zones")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "name"),
+                name="netbox_ceph_rgw_zone_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwzone", args=[self.pk])
+
+
+class CephRGWPlacementTarget(NetBoxModel):
+    """RGW placement target reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_placement_targets",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_placement_targets",
+        null=True,
+        blank=True,
+    )
+    zonegroup = models.ForeignKey(
+        to="netbox_ceph.CephRGWZoneGroup",
+        on_delete=models.SET_NULL,
+        related_name="placement_targets",
+        null=True,
+        blank=True,
+    )
+    zone = models.ForeignKey(
+        to="netbox_ceph.CephRGWZone",
+        on_delete=models.SET_NULL,
+        related_name="placement_targets",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    storage_classes = models.JSONField(
+        blank=True,
+        default=list,
+        encoder=CustomFieldJSONEncoder,
+    )
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "name")
+        verbose_name = _("Ceph RGW placement target")
+        verbose_name_plural = _("Ceph RGW placement targets")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "name"),
+                name="netbox_ceph_rgw_placement_target_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwplacementtarget", args=[self.pk])
+
+
+class CephRGWUserReflected(NetBoxModel):
+    """RGW/S3 user metadata reflected from live Ceph state.
+
+    This model deliberately stores only non-secret user metadata. S3 access
+    keys, secret keys, passwords, tokens, and credential refs do not belong in
+    reflected NetBox inventory.
+    """
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_users_reflected",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_users_reflected",
+        null=True,
+        blank=True,
+    )
+    uid = models.CharField(max_length=255)
+    display_name = models.CharField(max_length=255, blank=True)
+    email = models.CharField(max_length=255, blank=True)
+    tenant = models.CharField(max_length=255, blank=True)
+    suspended = models.BooleanField(default=False)
+    max_buckets = models.IntegerField(null=True, blank=True)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "tenant", "uid")
+        verbose_name = _("Ceph RGW user (reflected)")
+        verbose_name_plural = _("Ceph RGW users (reflected)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "tenant", "uid"),
+                name="netbox_ceph_rgw_user_reflected_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        if self.tenant:
+            return f"{self.tenant}/{self.uid}"
+        return self.uid
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwuserreflected", args=[self.pk])
+
+
+class CephRGWBucketReflected(NetBoxModel):
+    """RGW/S3 bucket metadata reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rgw_buckets_reflected",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rgw_buckets_reflected",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=255)
+    owner_uid = models.CharField(max_length=255, blank=True)
+    tenant = models.CharField(max_length=255, blank=True)
+    num_objects = models.BigIntegerField(null=True, blank=True)
+    size_bytes = models.BigIntegerField(null=True, blank=True)
+    placement_rule = models.CharField(max_length=255, blank=True)
+    versioning = models.CharField(max_length=32, blank=True)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "tenant", "name")
+        verbose_name = _("Ceph RGW bucket (reflected)")
+        verbose_name_plural = _("Ceph RGW buckets (reflected)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "tenant", "name"),
+                name="netbox_ceph_rgw_bucket_reflected_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        if self.tenant:
+            return f"{self.tenant}/{self.name}"
+        return self.name
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrgwbucketreflected", args=[self.pk])
+
+
+class CephRBDImage(NetBoxModel):
+    """RBD image reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rbd_images",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rbd_images",
+        null=True,
+        blank=True,
+    )
+    pool_name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    namespace = models.CharField(max_length=255, blank=True)
+    image_id = models.CharField(max_length=255, blank=True)
+    size_bytes = models.BigIntegerField(null=True, blank=True)
+    object_size = models.PositiveIntegerField(null=True, blank=True)
+    features = models.JSONField(blank=True, default=list, encoder=CustomFieldJSONEncoder)
+    num_objects = models.BigIntegerField(null=True, blank=True)
+    parent = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    data_pool = models.CharField(max_length=255, blank=True)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "pool_name", "namespace", "name")
+        verbose_name = _("Ceph RBD image")
+        verbose_name_plural = _("Ceph RBD images")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("endpoint", "pool_name", "namespace", "name"),
+                name="netbox_ceph_rbd_image_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        if self.namespace:
+            return f"{self.pool_name}/{self.namespace}/{self.name}"
+        return f"{self.pool_name}/{self.name}"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrbdimage", args=[self.pk])
+
+
+class CephRBDSnapshot(NetBoxModel):
+    """RBD snapshot reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rbd_snapshots",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rbd_snapshots",
+        null=True,
+        blank=True,
+    )
+    image = models.ForeignKey(
+        to="netbox_ceph.CephRBDImage",
+        on_delete=models.CASCADE,
+        related_name="snapshots",
+    )
+    name = models.CharField(max_length=255)
+    snap_id = models.PositiveIntegerField(null=True, blank=True)
+    size_bytes = models.BigIntegerField(null=True, blank=True)
+    protected = models.BooleanField(default=False)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("image", "name")
+        verbose_name = _("Ceph RBD snapshot")
+        verbose_name_plural = _("Ceph RBD snapshots")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("image", "name"),
+                name="netbox_ceph_rbd_snapshot_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.image}@{self.name}"
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrbdsnapshot", args=[self.pk])
+
+
+class CephRBDClone(NetBoxModel):
+    """RBD clone relationship reflected from live Ceph state."""
+
+    endpoint = models.ForeignKey(
+        to="netbox_proxbox.ProxmoxEndpoint",
+        on_delete=models.CASCADE,
+        related_name="ceph_rbd_clones",
+    )
+    cluster = models.ForeignKey(
+        to="netbox_ceph.CephCluster",
+        on_delete=models.CASCADE,
+        related_name="rbd_clones",
+        null=True,
+        blank=True,
+    )
+    parent_image = models.ForeignKey(
+        to="netbox_ceph.CephRBDImage",
+        on_delete=models.CASCADE,
+        related_name="clone_children",
+    )
+    parent_snapshot = models.ForeignKey(
+        to="netbox_ceph.CephRBDSnapshot",
+        on_delete=models.CASCADE,
+        related_name="clone_children",
+    )
+    child_pool_name = models.CharField(max_length=255)
+    child_name = models.CharField(max_length=255)
+    status = models.JSONField(blank=True, default=dict, encoder=CustomFieldJSONEncoder)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("endpoint", "child_pool_name", "child_name")
+        verbose_name = _("Ceph RBD clone")
+        verbose_name_plural = _("Ceph RBD clones")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("parent_image", "parent_snapshot", "child_pool_name", "child_name"),
+                name="netbox_ceph_rbd_clone_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.parent_image}@{self.parent_snapshot.name} -> "
+            f"{self.child_pool_name}/{self.child_name}"
+        )
+
+    def get_absolute_url(self) -> str:
+        return reverse("plugins:netbox_ceph:cephrbdclone", args=[self.pk])

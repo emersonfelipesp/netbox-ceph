@@ -33,12 +33,21 @@ from netbox_ceph.models import (  # noqa: E402
     CephPlan,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 
@@ -48,6 +57,23 @@ def test_v2_model_identity_constraints_are_named() -> None:
         CephProvider: "netbox_ceph_provider_identity",
         CephDriftRecord: "netbox_ceph_drift_record_identity",
         CephMetricSnapshot: "netbox_ceph_metric_snapshot_identity",
+    }
+
+    for model, constraint_name in constraints.items():
+        assert constraint_name in {constraint.name for constraint in model._meta.constraints}
+
+
+def test_reflected_rgw_rbd_identity_constraints_are_named() -> None:
+    constraints = {
+        CephRGWRealm: "netbox_ceph_rgw_realm_identity",
+        CephRGWZoneGroup: "netbox_ceph_rgw_zone_group_identity",
+        CephRGWZone: "netbox_ceph_rgw_zone_identity",
+        CephRGWPlacementTarget: "netbox_ceph_rgw_placement_target_identity",
+        CephRGWUserReflected: "netbox_ceph_rgw_user_reflected_identity",
+        CephRGWBucketReflected: "netbox_ceph_rgw_bucket_reflected_identity",
+        CephRBDImage: "netbox_ceph_rbd_image_identity",
+        CephRBDSnapshot: "netbox_ceph_rbd_snapshot_identity",
+        CephRBDClone: "netbox_ceph_rbd_clone_identity",
     }
 
     for model, constraint_name in constraints.items():
@@ -64,6 +90,15 @@ def test_v2_model_identity_constraints_are_named() -> None:
         (CephOperationRun, "cephoperationrun"),
         (CephDriftRecord, "cephdriftrecord"),
         (CephMetricSnapshot, "cephmetricsnapshot"),
+        (CephRGWRealm, "cephrgwrealm"),
+        (CephRGWZoneGroup, "cephrgwzonegroup"),
+        (CephRGWZone, "cephrgwzone"),
+        (CephRGWPlacementTarget, "cephrgwplacementtarget"),
+        (CephRGWUserReflected, "cephrgwuserreflected"),
+        (CephRGWBucketReflected, "cephrgwbucketreflected"),
+        (CephRBDImage, "cephrbdimage"),
+        (CephRBDSnapshot, "cephrbdsnapshot"),
+        (CephRBDClone, "cephrbdclone"),
     ],
 )
 def test_v2_models_reverse_absolute_urls(model, route_name: str) -> None:
@@ -260,6 +295,19 @@ def test_rgw_desired_state_serializers_do_not_expose_secret_fields() -> None:
         assert forbidden.isdisjoint(set(serializer_cls.Meta.fields))
 
 
+def test_rgw_reflected_serializers_do_not_expose_secret_fields() -> None:
+    forbidden = {"access_key", "secret_key", "password", "token"}
+    for serializer_cls in (
+        serializers.CephRGWRealmSerializer,
+        serializers.CephRGWZoneGroupSerializer,
+        serializers.CephRGWZoneSerializer,
+        serializers.CephRGWPlacementTargetSerializer,
+        serializers.CephRGWUserReflectedSerializer,
+        serializers.CephRGWBucketReflectedSerializer,
+    ):
+        assert forbidden.isdisjoint(set(serializer_cls.Meta.fields))
+
+
 def test_desired_state_viewsets_allow_writes() -> None:
     for viewset_cls in (
         views.CephPoolDesiredStateViewSet,
@@ -312,6 +360,15 @@ def test_reflected_inventory_viewsets_remain_read_only() -> None:
         views.CephCrushRuleViewSet,
         views.CephFlagViewSet,
         views.CephHealthCheckViewSet,
+        views.CephRGWRealmViewSet,
+        views.CephRGWZoneGroupViewSet,
+        views.CephRGWZoneViewSet,
+        views.CephRGWPlacementTargetViewSet,
+        views.CephRGWUserReflectedViewSet,
+        views.CephRGWBucketReflectedViewSet,
+        views.CephRBDImageViewSet,
+        views.CephRBDSnapshotViewSet,
+        views.CephRBDCloneViewSet,
     )
 
     for viewset_cls in reflected_viewsets:

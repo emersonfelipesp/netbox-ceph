@@ -23,12 +23,21 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 
@@ -264,6 +273,279 @@ class CephHealthCheckTable(NetBoxTable):
             "actions",
         )
         default_columns = ("name", "endpoint", "cluster", "severity", "summary", "last_seen_at")
+
+
+class CephRGWRealmTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    is_default = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWRealm
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "is_default",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = ("name", "endpoint", "cluster", "is_default", "last_seen_at")
+
+
+class CephRGWZoneGroupTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    realm = tables.Column(linkify=True)
+    is_master = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWZoneGroup
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "realm",
+            "is_master",
+            "endpoints",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "endpoint",
+            "cluster",
+            "realm",
+            "is_master",
+            "last_seen_at",
+        )
+
+
+class CephRGWZoneTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    zonegroup = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWZone
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "zonegroup",
+            "endpoints",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = ("name", "endpoint", "cluster", "zonegroup", "last_seen_at")
+
+
+class CephRGWPlacementTargetTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    zonegroup = tables.Column(linkify=True)
+    zone = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWPlacementTarget
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "zonegroup",
+            "zone",
+            "storage_classes",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "endpoint",
+            "cluster",
+            "zonegroup",
+            "zone",
+            "last_seen_at",
+        )
+
+
+class CephRGWUserReflectedTable(NetBoxTable):
+    uid = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    suspended = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWUserReflected
+        fields = (
+            "pk",
+            "id",
+            "uid",
+            "endpoint",
+            "cluster",
+            "tenant",
+            "display_name",
+            "email",
+            "suspended",
+            "max_buckets",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "uid",
+            "endpoint",
+            "cluster",
+            "tenant",
+            "display_name",
+            "suspended",
+            "last_seen_at",
+        )
+
+
+class CephRGWBucketReflectedTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRGWBucketReflected
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "tenant",
+            "owner_uid",
+            "num_objects",
+            "size_bytes",
+            "placement_rule",
+            "versioning",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "endpoint",
+            "cluster",
+            "tenant",
+            "owner_uid",
+            "num_objects",
+            "size_bytes",
+            "last_seen_at",
+        )
+
+
+class CephRBDImageTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRBDImage
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "pool_name",
+            "namespace",
+            "image_id",
+            "size_bytes",
+            "object_size",
+            "features",
+            "num_objects",
+            "data_pool",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "endpoint",
+            "cluster",
+            "pool_name",
+            "namespace",
+            "size_bytes",
+            "data_pool",
+            "last_seen_at",
+        )
+
+
+class CephRBDSnapshotTable(NetBoxTable):
+    name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    image = tables.Column(linkify=True)
+    protected = BooleanColumn()
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRBDSnapshot
+        fields = (
+            "pk",
+            "id",
+            "name",
+            "endpoint",
+            "cluster",
+            "image",
+            "snap_id",
+            "size_bytes",
+            "protected",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "name",
+            "endpoint",
+            "cluster",
+            "image",
+            "snap_id",
+            "protected",
+            "last_seen_at",
+        )
+
+
+class CephRBDCloneTable(NetBoxTable):
+    child_name = tables.Column(linkify=True)
+    endpoint = tables.Column(linkify=True)
+    cluster = tables.Column(linkify=True)
+    parent_image = tables.Column(linkify=True)
+    parent_snapshot = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephRBDClone
+        fields = (
+            "pk",
+            "id",
+            "child_name",
+            "endpoint",
+            "cluster",
+            "parent_image",
+            "parent_snapshot",
+            "child_pool_name",
+            "last_seen_at",
+            "actions",
+        )
+        default_columns = (
+            "child_name",
+            "endpoint",
+            "cluster",
+            "parent_image",
+            "parent_snapshot",
+            "child_pool_name",
+            "last_seen_at",
+        )
 
 
 class CephProviderTable(NetBoxTable):

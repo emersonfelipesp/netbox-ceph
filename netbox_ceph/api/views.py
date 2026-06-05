@@ -33,12 +33,21 @@ from netbox_ceph.models import (
     CephPool,
     CephPoolDesiredState,
     CephProvider,
+    CephRBDClone,
+    CephRBDImage,
     CephRBDImageDesiredState,
+    CephRBDSnapshot,
     CephRBDSnapshotDesiredState,
     CephRGWBucketDesiredState,
+    CephRGWBucketReflected,
+    CephRGWPlacementTarget,
+    CephRGWRealm,
     CephRGWRealmDesiredState,
     CephRGWUserDesiredState,
+    CephRGWUserReflected,
+    CephRGWZone,
     CephRGWZoneDesiredState,
+    CephRGWZoneGroup,
     CephValidationResult,
 )
 from netbox_ceph.services.operation_actions import (
@@ -144,6 +153,79 @@ class CephHealthCheckViewSet(NetBoxModelViewSet):
     queryset = CephHealthCheck.objects.select_related("endpoint", "cluster").all()
     serializer_class = serializers.CephHealthCheckSerializer
     filterset_class = filtersets.CephHealthCheckFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWRealmViewSet(NetBoxModelViewSet):
+    queryset = CephRGWRealm.objects.select_related("endpoint", "cluster").all()
+    serializer_class = serializers.CephRGWRealmSerializer
+    filterset_class = filtersets.CephRGWRealmFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWZoneGroupViewSet(NetBoxModelViewSet):
+    queryset = CephRGWZoneGroup.objects.select_related("endpoint", "cluster", "realm").all()
+    serializer_class = serializers.CephRGWZoneGroupSerializer
+    filterset_class = filtersets.CephRGWZoneGroupFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWZoneViewSet(NetBoxModelViewSet):
+    queryset = CephRGWZone.objects.select_related("endpoint", "cluster", "zonegroup").all()
+    serializer_class = serializers.CephRGWZoneSerializer
+    filterset_class = filtersets.CephRGWZoneFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWPlacementTargetViewSet(NetBoxModelViewSet):
+    queryset = CephRGWPlacementTarget.objects.select_related(
+        "endpoint",
+        "cluster",
+        "zonegroup",
+        "zone",
+    ).all()
+    serializer_class = serializers.CephRGWPlacementTargetSerializer
+    filterset_class = filtersets.CephRGWPlacementTargetFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWUserReflectedViewSet(NetBoxModelViewSet):
+    queryset = CephRGWUserReflected.objects.select_related("endpoint", "cluster").all()
+    serializer_class = serializers.CephRGWUserReflectedSerializer
+    filterset_class = filtersets.CephRGWUserReflectedFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRGWBucketReflectedViewSet(NetBoxModelViewSet):
+    queryset = CephRGWBucketReflected.objects.select_related("endpoint", "cluster").all()
+    serializer_class = serializers.CephRGWBucketReflectedSerializer
+    filterset_class = filtersets.CephRGWBucketReflectedFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRBDImageViewSet(NetBoxModelViewSet):
+    queryset = CephRBDImage.objects.select_related("endpoint", "cluster").all()
+    serializer_class = serializers.CephRBDImageSerializer
+    filterset_class = filtersets.CephRBDImageFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRBDSnapshotViewSet(NetBoxModelViewSet):
+    queryset = CephRBDSnapshot.objects.select_related("endpoint", "cluster", "image").all()
+    serializer_class = serializers.CephRBDSnapshotSerializer
+    filterset_class = filtersets.CephRBDSnapshotFilterSet
+    http_method_names = _READ_ONLY_HTTP_METHODS
+
+
+class CephRBDCloneViewSet(NetBoxModelViewSet):
+    queryset = CephRBDClone.objects.select_related(
+        "endpoint",
+        "cluster",
+        "parent_image",
+        "parent_snapshot",
+    ).all()
+    serializer_class = serializers.CephRBDCloneSerializer
+    filterset_class = filtersets.CephRBDCloneFilterSet
     http_method_names = _READ_ONLY_HTTP_METHODS
 
 
