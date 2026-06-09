@@ -35,24 +35,25 @@ See the plugin's code structure:
 - `netbox-ceph_plugin/templates/` — Django HTML templates
 - `tests/` — unit and integration tests
 
-## Automatic Production Deployment
+## Automatic Staging/Production Deployment
 
-New commits to `main` automatically deploy to `netbox.nmulti.cloud`.
+The deploy workflow treats `develop` as staging and `main` as production.
+Pushes to `develop` deploy `netbox-ceph` to
+`https://staging.netbox.nmulti.cloud`; pushes to `main` deploy to
+`https://netbox.nmulti.cloud`.
 
 **Deploy job in `.gitea/workflows/deploy-production.yml`:**
-- Triggers on `push: [main]` and `workflow_dispatch` (optional `ref` input).
-- Runs on the `prod-deploy` runner, which executes **on the production host**.
-- Runs the local deploy script `/opt/nmulticloud/deploy/bin/deploy-netbox-plugin ceph "$REF"`
-  directly (mirroring the `deploy-app` pattern used by sibling services); it
-  falls back to `ssh nmc-prod-207 -- deploy-plugin ceph "$REF"` only when the
-  script is absent (runner not co-located with the target).
+- Triggers on `push: [develop, main]` and `workflow_dispatch` with optional `ref` and optional `environment`.
+- Runs on the `prod-deploy` runner, which has access to the NetBox deploy host.
+- For staging, runs `/opt/nmulticloud/deploy/bin/deploy-netbox-plugin-staging netbox-ceph "$REF"`.
+- For production, runs `/opt/nmulticloud/deploy/bin/deploy-netbox-plugin ceph "$REF"` directly when local, or falls back to `ssh nmc-prod-207 -- deploy-plugin ceph "$REF"` when the script is absent.
 
 **Security hardening:**
 - REF is passed via an environment variable, not direct context interpolation.
 - A bash `case` statement validates the ref format (version tags, `main`/`develop`,
   7+ char commit SHAs) before use.
 
-**What `deploy-netbox-plugin ceph <ref>` does** (on the prod host, as the runner):
+**What the deploy helper does** (on the target host, as the runner):
 1. Discovers the plugin's live editable source directory from the running
    interpreter (production loads plugins editable from the workspace checkout,
    not `/opt/netbox/netbox/<plugin>`).
@@ -67,13 +68,14 @@ New commits to `main` automatically deploy to `netbox.nmulti.cloud`.
 
 **Monitoring:**
 - Watch the `deploy-production.yml` run in Gitea Actions (the `Deploy plugin` job).
-- Verify live: `curl -sS https://netbox.nmulti.cloud/api/plugins/ceph/` → `403`
+- Verify staging: `curl -sS https://staging.netbox.nmulti.cloud/api/plugins/ceph/` → `403`
+- Verify production: `curl -sS https://netbox.nmulti.cloud/api/plugins/ceph/` → `403`
   (auth-gated, plugin loaded).
 
 **Manual deployment trigger:**
 ```bash
 # Manual dispatch of the deploy workflow
-nms git actions run netbox-ceph .gitea/workflows/deploy-production.yml -r main -f ref=v0.1.0
+nms git actions run netbox-ceph .gitea/workflows/deploy-production.yml -r main -f environment=production -f ref=v0.1.0
 
 # Or directly on the production host
 /opt/nmulticloud/deploy/bin/deploy-netbox-plugin ceph v0.1.0
