@@ -9,6 +9,14 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+SUPPORTED_NETBOX_IMAGES = (
+    "netboxcommunity/netbox:v4.5.8",
+    "netboxcommunity/netbox:v4.5.9",
+    "netboxcommunity/netbox:v4.6.0",
+    "netboxcommunity/netbox:v4.6.1",
+    "netboxcommunity/netbox:v4.6.2",
+    "netboxcommunity/netbox:v4.6.3",
+)
 
 
 def test_package_importable() -> None:
@@ -50,3 +58,27 @@ def test_package_metadata_version() -> None:
     except metadata.PackageNotFoundError:
         pytest.skip("netbox-ceph is not installed in the current environment")
     assert version.count(".") >= 2
+
+
+def test_e2e_workflow_covers_supported_netbox_versions() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
+
+    for image in SUPPORTED_NETBOX_IMAGES:
+        assert image in workflow
+
+
+def test_docs_name_supported_netbox_versions() -> None:
+    docs = "\n".join(
+        [
+            (ROOT / "CERTIFICATION.md").read_text(encoding="utf-8"),
+            (ROOT / "README.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "certification.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "index.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "release-notes" / "version-0.0.1.post1.md").read_text(
+                encoding="utf-8"
+            ),
+        ]
+    )
+
+    for image in SUPPORTED_NETBOX_IMAGES:
+        assert image.rsplit(":", 1)[1] in docs
