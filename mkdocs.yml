@@ -60,6 +60,7 @@ nav:
   - Installation: installation.md
   - Models: models.md
   - Sync Jobs: sync.md
+  - REST API: api.md
   - Ceph v2:
       - Overview: v2/overview.md
       - Providers: v2/providers.md
