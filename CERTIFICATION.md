@@ -10,7 +10,7 @@ This checklist tracks readiness for the NetBox Plugin Certification Program.
 | Dependency policy | Requires `netbox-proxbox>=0.0.18,<0.1.0` and communicates with `proxbox-api` over HTTP |
 | CI | GitHub Actions run lint, compile, pytest, docs, page coverage, screenshot capture, and release validation |
 | Documentation | README, MkDocs site, installation, models, sync, release notes, and support links |
-| Screenshots | `.github/workflows/docs-screenshots.yml` captures deterministic NetBox v4.6.3 UI screenshots into `docs/assets/screenshots` |
+| Screenshots | `.github/workflows/docs-screenshots.yml` captures deterministic NetBox v4.6.4 UI screenshots into `docs/assets/screenshots` |
 | Icon | NetBox menu uses Material Design Icons class `mdi mdi-database-clock` |
 | Maintainer access | Repositories stay under `emersonfelipesp`; NetBox Labs staff can be invited as collaborators when requested |
 
@@ -22,4 +22,4 @@ This checklist tracks readiness for the NetBox Plugin Certification Program.
 - Support: <https://github.com/emersonfelipesp/netbox-ceph/issues>
 - Certification target release: `0.0.1.post1`
 - Verified NetBox targets: `v4.5.8`, `v4.5.9`, `v4.6.0`, `v4.6.1`,
-  `v4.6.2`, and `v4.6.3`
+  `v4.6.2`, `v4.6.3`, and `v4.6.4`
