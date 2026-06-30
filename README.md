@@ -91,8 +91,8 @@ Use GitHub Issues for bugs and feature requests:
 Certification evidence is tracked in [CERTIFICATION.md](./CERTIFICATION.md).
 The repository includes Apache-2.0 licensing, PyPI metadata, compatibility
 metadata, GitHub Actions CI, release validation, docs publishing, screenshot
-capture, page-coverage workflows for NetBox v4.6.1, and Docker install smoke
-coverage for NetBox v4.5.8, v4.5.9, v4.6.0, v4.6.1, v4.6.2, and v4.6.3.
+capture, page-coverage workflows for NetBox v4.6.4, and Docker install smoke
+coverage for NetBox v4.5.8, v4.5.9, v4.6.0, v4.6.1, v4.6.2, v4.6.3, and v4.6.4.
 
 ## License
 
