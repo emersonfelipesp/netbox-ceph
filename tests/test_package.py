@@ -61,7 +61,9 @@ def test_package_metadata_version() -> None:
 
 
 def test_e2e_workflow_covers_supported_netbox_versions() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "e2e.yml").read_text(
+        encoding="utf-8"
+    )
 
     for image in SUPPORTED_NETBOX_IMAGES:
         assert image in workflow
@@ -72,6 +74,7 @@ def test_docs_name_supported_netbox_versions() -> None:
         [
             (ROOT / "CERTIFICATION.md").read_text(encoding="utf-8"),
             (ROOT / "README.md").read_text(encoding="utf-8"),
+            (ROOT / "COMPATIBILITY.md").read_text(encoding="utf-8"),
             (ROOT / "docs" / "certification.md").read_text(encoding="utf-8"),
             (ROOT / "docs" / "index.md").read_text(encoding="utf-8"),
             (ROOT / "docs" / "release-notes" / "version-0.0.1.post1.md").read_text(

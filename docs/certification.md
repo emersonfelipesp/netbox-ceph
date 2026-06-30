@@ -7,7 +7,7 @@ read-only companion plugin for Proxmox-managed Ceph inventory.
 | --- | --- |
 | License | Apache-2.0 in the repository and package metadata |
 | Package | Published as `netbox-ceph` on PyPI with source, docs, and issues URLs |
-| Compatibility | NetBox `4.5.8` through `4.6.3`; verified against `v4.5.8`, `v4.5.9`, `v4.6.0`, `v4.6.1`, `v4.6.2`, and `v4.6.3` |
+| Compatibility | NetBox `4.5.8` through `4.6.x`; verified against `v4.5.8`, `v4.5.9`, `v4.6.0`, `v4.6.1`, `v4.6.2`, and `v4.6.3` |
 | Tests | GitHub Actions run lint, compile, pytest, Docker install smoke, page coverage, and release validation |
 | Docs | README plus MkDocs installation, models, sync, certification, and release-note pages |
 | Screenshots | `docs-screenshots.yml` captures NetBox v4.6.3 UI screenshots on release tags or manual dispatch |
