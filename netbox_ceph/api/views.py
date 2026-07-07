@@ -11,10 +11,12 @@ from __future__ import annotations
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import MethodNotAllowed
 from rest_framework.response import Response
 
 from netbox_ceph import filtersets
 from netbox_ceph.api import serializers
+from netbox_ceph.jobs import CEPH_SYNC_QUEUE_NAME, CephSyncJob
 from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
@@ -58,6 +60,7 @@ from netbox_ceph.services.operation_actions import (
 )
 
 _READ_ONLY_HTTP_METHODS = ("get", "head", "options")
+_READ_ONLY_WITH_DETAIL_POST_HTTP_METHODS = ("get", "post", "head", "options")
 
 # OperationActionError.kind -> HTTP status for action endpoints.
 _ERROR_STATUS = {
@@ -72,6 +75,13 @@ def _authenticated_user(request):
     user = getattr(request, "user", None)
     if user is not None and getattr(user, "is_authenticated", False):
         return user
+    return None
+
+
+def _request_data_value(request, key: str) -> object | None:
+    data = getattr(request, "data", None)
+    if hasattr(data, "get"):
+        return data.get(key)
     return None
 
 
@@ -104,7 +114,43 @@ class CephClusterViewSet(NetBoxModelViewSet):
     queryset = CephCluster.objects.select_related("endpoint", "proxmox_cluster").all()
     serializer_class = serializers.CephClusterSerializer
     filterset_class = filtersets.CephClusterFilterSet
-    http_method_names = _READ_ONLY_HTTP_METHODS
+    http_method_names = _READ_ONLY_WITH_DETAIL_POST_HTTP_METHODS
+
+    def create(self, request, *args, **kwargs):
+        raise MethodNotAllowed("POST")
+
+    @action(detail=True, methods=["post"])
+    def sync(self, request, pk=None):
+        cluster = self.get_object()
+        cluster_pk = getattr(cluster, "pk", pk)
+        try:
+            job = CephSyncJob.enqueue(
+                user=_authenticated_user(request),
+                queue_name=CEPH_SYNC_QUEUE_NAME,
+                name=f"Ceph Sync: {cluster}",
+                cluster_pk=cluster_pk,
+                resources=_request_data_value(request, "resources"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        job_data = getattr(job, "data", {})
+        params: dict[str, object] = {}
+        if isinstance(job_data, dict):
+            ceph_sync = job_data.get("ceph_sync", {})
+            if isinstance(ceph_sync, dict):
+                raw_params = ceph_sync.get("params", {})
+                if isinstance(raw_params, dict):
+                    params = raw_params
+
+        payload: dict[str, object] = {
+            "job": getattr(job, "pk", None),
+            "cluster": cluster_pk,
+            "resources": params.get("resources", []),
+        }
+        if hasattr(job, "get_absolute_url"):
+            payload["url"] = job.get_absolute_url()
+        return Response(payload, status=status.HTTP_202_ACCEPTED)
 
 
 class CephDaemonViewSet(NetBoxModelViewSet):

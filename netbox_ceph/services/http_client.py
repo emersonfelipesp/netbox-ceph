@@ -87,7 +87,7 @@ def _get_json(
 
     if response.status_code >= 400:
         raise CephBackendError(
-            f"Ceph backend returned HTTP {response.status_code} for {path}: {response.text[:500]}"
+            f"Ceph backend returned HTTP {response.status_code} for {path}."
         )
 
     try:

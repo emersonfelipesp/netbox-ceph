@@ -175,6 +175,16 @@ opaque pointer only. Passwords, tokens, access keys, secret keys, and other
 credentials live in proxbox-api or its secret store. Payloads logged or stored
 through the v2 orchestrator path must pass through `redact_secrets()`.
 
+## Ceph v1 Reflection Sync Dispatch
+
+`CephClusterViewSet.sync` exposes `POST
+/api/plugins/ceph/clusters/{id}/sync/` and enqueues `CephSyncJob` with keyword
+arguments only: `cluster_pk`, `resources`, `queue_name`, `name`, and `user`.
+Do not pass ORM objects through `instance=`. `resources` may be omitted, a
+single resource, a comma-separated string, or a list; the job normalizes,
+deduplicates, and validates it before enqueueing. v1 HTTP errors store only the
+status/path summary in job data, never raw proxbox-api response bodies.
+
 ## Orchestrator Feature Detection
 
 `netbox_ceph.services.orchestrator.CephOrchestratorClient` calls proxbox-api
