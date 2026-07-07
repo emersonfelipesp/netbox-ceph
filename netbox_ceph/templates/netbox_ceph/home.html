@@ -9,8 +9,8 @@
         <p>
           The netbox-ceph plugin reflects Ceph state managed through Proxmox VE.
           v1 is intentionally read-only. Use Proxbox endpoints to feed the
-          reflected state, and trigger sync runs from the NetBox <em>Jobs</em>
-          UI.
+          reflected state, enqueue sync runs through the cluster REST API, and
+          follow queued runs from the NetBox <em>Jobs</em> UI.
         </p>
         <a class="btn btn-sm btn-primary" href="{% url 'plugins:netbox_ceph:cephcluster_list' %}">
           Browse clusters

@@ -47,7 +47,8 @@ to accommodate fan-out queries on large or degraded clusters.
 
 Errors from the backend surface as `CephBackendError` and are recorded in the
 job log without aborting the whole run — a failure on one resource does not
-prevent other resources from syncing.
+prevent other resources from syncing. The stored job data records the HTTP
+status and route, but never stores raw proxbox-api response bodies.
 
 ### Branching (optional)
 
@@ -68,10 +69,10 @@ be installed. Without it, `branching_enabled` has no effect.
 
 ## Dispatching a sync
 
-### From the NetBox UI
+### From NetBox
 
-Navigate to **Plugins → Ceph → Settings** and click **Sync Now**, or open any
-`CephCluster` detail page and click **Sync**.
+Enqueue syncs through the cluster REST action below, then follow the queued job
+from NetBox's core **Jobs** UI.
 
 ### Via the REST API
 

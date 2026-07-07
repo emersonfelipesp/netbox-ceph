@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable
 from typing import Any
 
 from netbox.constants import RQ_QUEUE_DEFAULT
@@ -50,20 +51,32 @@ CEPH_SYNC_JOB_TIMEOUT = 7200
 DEFAULT_SYNC_RESOURCES: tuple[str, ...] = ("full",)
 
 
-def _normalize_resources(resources: list[str] | None) -> list[str]:
-    if not resources:
+def _resource_values(resources: object) -> list[object]:
+    if resources is None:
+        return []
+    if isinstance(resources, str):
+        return resources.split(",")
+    if isinstance(resources, Iterable):
+        return list(resources)
+    return [resources]
+
+
+def _normalize_resources(resources: object = None) -> list[str]:
+    raw_values = _resource_values(resources)
+    if not raw_values:
         return list(DEFAULT_SYNC_RESOURCES)
     normalized: list[str] = []
-    for raw in resources:
-        value = str(raw).strip().lower()
-        if not value:
-            continue
-        if value not in CEPH_SYNC_RESOURCES:
-            raise ValueError(
-                f"Unknown Ceph sync resource {value!r}; expected one of {CEPH_SYNC_RESOURCES}"
-            )
-        if value not in normalized:
-            normalized.append(value)
+    for raw in raw_values:
+        for candidate in str(raw).split(","):
+            value = candidate.strip().lower()
+            if not value:
+                continue
+            if value not in CEPH_SYNC_RESOURCES:
+                raise ValueError(
+                    f"Unknown Ceph sync resource {value!r}; expected one of {CEPH_SYNC_RESOURCES}"
+                )
+            if value not in normalized:
+                normalized.append(value)
     return normalized or list(DEFAULT_SYNC_RESOURCES)
 
 
@@ -74,22 +87,27 @@ class CephSyncJob(JobRunner):
         name = "Ceph Sync"
 
     @classmethod
-    def enqueue(cls, *args: object, **kwargs: object) -> Job:
+    def enqueue(cls, **kwargs: object) -> Job:
         """Enqueue with a long ``job_timeout`` so slow Ceph clusters don't get killed."""
         kwargs.setdefault("job_timeout", CEPH_SYNC_JOB_TIMEOUT)
+        job_target = kwargs.pop("instance", None)
+        if job_target is not None:
+            raise ValueError("Cannot enqueue CephSyncJob with instance; use cluster_pk instead.")
         resources_kw = kwargs.pop("resources", None)
+        cluster_pk = kwargs.get("cluster_pk")
         try:
-            resources = _normalize_resources(
-                list(resources_kw) if resources_kw is not None else None
-            )
+            resources = _normalize_resources(resources_kw)
         except ValueError as exc:
             raise ValueError(f"Cannot enqueue CephSyncJob: {exc}") from exc
         kwargs["resources"] = resources
 
-        job = super().enqueue(*args, **kwargs)
+        job = super().enqueue(**kwargs)
+        params: dict[str, Any] = {"resources": resources}
+        if cluster_pk is not None:
+            params["cluster_pk"] = cluster_pk
         job.data = {
             "ceph_sync": {
-                "params": {"resources": resources},
+                "params": params,
             }
         }
         job.save(update_fields=["data"])
@@ -98,6 +116,7 @@ class CephSyncJob(JobRunner):
     def run(
         self,
         resources: list[str] | None = None,
+        cluster_pk: int | str | None = None,
         **_kwargs: object,
     ) -> None:
         """Run one or more proxbox-api Ceph sync calls."""
@@ -134,6 +153,7 @@ class CephSyncJob(JobRunner):
 
         params: dict[str, Any] = {
             "resources": normalized_resources,
+            "cluster_pk": cluster_pk,
             "netbox_branch_schema_id": netbox_branch_schema_id,
         }
         self.job.data = {"ceph_sync": {"params": params}}

@@ -16,6 +16,12 @@ read-only v1 inventory: provider references, operation requests, generated
 plans, validation findings, apply-run audit records, drift records, metric
 snapshots, and a feature-detecting proxbox-api orchestrator client.
 
+v1 reflection syncs are dispatched with `POST
+/api/plugins/ceph/clusters/{id}/sync/`, which enqueues `CephSyncJob` with a
+7200-second timeout. Pass `resources` as a list or comma-separated string such
+as `["pools", "osds"]`; omit it to run the default `full` sync. Queued runs are
+visible in NetBox's core Jobs UI.
+
 Desired-state configuration objects (`CephPoolDesiredState`,
 `CephFilesystemDesiredState`, `CephRBDImageDesiredState`,
 `CephRBDSnapshotDesiredState`, `CephRGWRealmDesiredState`,
