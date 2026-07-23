@@ -14,7 +14,14 @@ class Migration(migrations.Migration):
     dependencies = [
         ("extras", "0002_squashed_0059"),
         ("netbox_proxbox", "0001_initial"),
-        ("netbox_proxbox", "0038_v0_0_16_release"),
+        # Stable common ancestor across the released netbox-proxbox lineages.
+        # The previous target (0038_v0_0_16_release) only exists in
+        # netbox-proxbox >= 0.0.18, while estates that installed this plugin
+        # against 0.0.16.postN recorded the legacy 0038 node instead - a
+        # one-step upgrade then failed with InconsistentMigrationHistory.
+        # 0016_proxmox_cluster_node_models transitively provides every
+        # Proxbox model referenced here and exists in both lineages.
+        ("netbox_proxbox", "0016_proxmox_cluster_node_models"),
     ]
 
     operations = [
