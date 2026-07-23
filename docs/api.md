@@ -32,7 +32,17 @@ These endpoints are **read-only** mirrors of Proxmox-managed Ceph state.
 
 ## v2 — Control plane endpoints
 
-These endpoints are **writable** NetBox control-plane records.
+Desired-state and operation-request endpoints are writable. Plans, validations,
+approvals, runs, drift, and metric records are server-owned read-only audit or
+observation surfaces.
+
+The operation serializer requires `execution_node`. Plan, operation-approval,
+and operation-run serializers expose `backend_endpoint_config_revision`,
+`plugin_endpoint_id`, `provider_id_snapshot`, `provider_kind_snapshot`,
+`execution_node`, and `local_config_digest`. These are non-secret evidence
+values copied across the audit chain; consumers may correlate them but must not
+interpret them as credentials or mutation authority. Approval issuance owner/
+expiry fields are read-only crash-recovery metadata.
 
 ### Provider and operations
 
@@ -41,6 +51,7 @@ These endpoints are **writable** NetBox control-plane records.
 | `/api/plugins/ceph/providers/` | `CephProvider` — external controller references |
 | `/api/plugins/ceph/operations/` | `CephOperation` — requested actions |
 | `/api/plugins/ceph/plans/` | `CephPlan` — provider-generated previews |
+| `/api/plugins/ceph/operation-approvals/` | `CephOperationApproval` — token-free two-person approval/recovery audit |
 | `/api/plugins/ceph/validation-results/` | `CephValidationResult` — plan findings |
 | `/api/plugins/ceph/operation-runs/` | `CephOperationRun` — apply audit records |
 | `/api/plugins/ceph/drift-records/` | `CephDriftRecord` — desired vs actual |
@@ -59,6 +70,12 @@ These endpoints are **writable** NetBox control-plane records.
 | `/api/plugins/ceph/rgw-user-desired-states/` | RGW user desired state |
 | `/api/plugins/ceph/rgw-bucket-desired-states/` | S3 bucket desired state |
 
+All eight desired-state resources support CRUD. Only pool and filesystem rows
+can currently generate operations through the UI/service contract. RBD/RGW
+intent does not imply provider write support. Pool/CephFS generation requires an
+exact `execution_node` and rejects fields outside proxbox-api issue #258's typed
+writer schema.
+
 ## Custom actions
 
 | Endpoint | Method | Description |
@@ -66,7 +83,8 @@ These endpoints are **writable** NetBox control-plane records.
 | `/api/plugins/ceph/clusters/{id}/sync/` | POST | Enqueue a `CephSyncJob` for this cluster |
 | `/api/plugins/ceph/providers/{id}/reconcile/` | POST | Trigger a provider-scoped v2 reconcile |
 | `/api/plugins/ceph/operations/{id}/plan/` | POST | Run the plan step and store a `CephPlan` |
-| `/api/plugins/ceph/operations/{id}/apply/` | POST | Apply a planned operation (requires `confirmed=true` for destructive operations) |
+| `/api/plugins/ceph/operations/{id}/approve-and-apply/` | POST | A distinct approver obtains a one-time backend approval and immediately applies the immutable plan |
+| `/api/plugins/ceph/operations/{id}/apply/` | POST | Compatibility alias for the same approve-and-apply flow; legacy `confirmed` input is ignored |
 
 ## Example
 

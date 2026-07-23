@@ -13,6 +13,8 @@ opaque ``credential_ref``; orchestrator payloads are redacted at the boundary.
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -24,15 +26,40 @@ from netbox_ceph.choices import (
     CephPoolAutoscaleChoices,
     CephPoolCompressionChoices,
 )
+from netbox_ceph.services.redaction import (
+    SecretBearingIntentError,
+    validate_secret_free_intent,
+)
+
+_EXECUTION_NODE_VALIDATOR = RegexValidator(
+    regex=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+    message=_("Enter an exact Proxmox node name (letters, numbers, '.', '_' and '-')."),
+)
 
 
-class CephPoolDesiredState(NetBoxModel):
+class _SecretFreeDesiredStateMixin:
+    """Enforce the no-credential invariant on model and ModelForm paths."""
+
+    intent_fields: tuple[str, ...] = ()
+
+    def clean(self) -> None:
+        super().clean()
+        intent = {field: getattr(self, field) for field in self.intent_fields}
+        try:
+            validate_secret_free_intent(intent)
+        except SecretBearingIntentError as exc:
+            raise ValidationError({"__all__": _(str(exc))}) from exc
+
+
+class CephPoolDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for a Ceph pool.
 
     Distinct from the reflected ``CephPool`` inventory model: this row is the
     intended state an operator manages from NetBox and feeds into a plan/apply
     operation.
     """
+
+    intent_fields = ("parameters",)
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -48,6 +75,12 @@ class CephPoolDesiredState(NetBoxModel):
         blank=True,
     )
     name = models.CharField(max_length=255)
+    execution_node = models.CharField(
+        max_length=128,
+        default="",
+        validators=(_EXECUTION_NODE_VALIDATOR,),
+        help_text=_("Exact Proxmox node that will execute this desired mutation."),
+    )
     enabled = models.BooleanField(
         default=True,
         help_text=_("Whether this desired state is active for reconciliation."),
@@ -99,8 +132,10 @@ class CephPoolDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephpooldesiredstate", args=[self.pk])
 
 
-class CephFilesystemDesiredState(NetBoxModel):
+class CephFilesystemDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for a CephFS filesystem."""
+
+    intent_fields = ("data_pools", "parameters")
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -116,6 +151,12 @@ class CephFilesystemDesiredState(NetBoxModel):
         blank=True,
     )
     name = models.CharField(max_length=255)
+    execution_node = models.CharField(
+        max_length=128,
+        default="",
+        validators=(_EXECUTION_NODE_VALIDATOR,),
+        help_text=_("Exact Proxmox node that will execute this desired mutation."),
+    )
     enabled = models.BooleanField(
         default=True,
         help_text=_("Whether this desired state is active for reconciliation."),
@@ -141,6 +182,8 @@ class CephFilesystemDesiredState(NetBoxModel):
     )
     standby_count = models.PositiveSmallIntegerField(default=1)
     max_mds = models.PositiveSmallIntegerField(default=1)
+    pg_num = models.PositiveIntegerField(null=True, blank=True)
+    add_storage = models.BooleanField(null=True, blank=True)
     quota_max_bytes = models.BigIntegerField(null=True, blank=True)
     parameters = models.JSONField(
         blank=True,
@@ -167,8 +210,10 @@ class CephFilesystemDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephfilesystemdesiredstate", args=[self.pk])
 
 
-class CephRBDImageDesiredState(NetBoxModel):
+class CephRBDImageDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for an RBD image."""
+
+    intent_fields = ("features", "metadata", "parameters")
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -242,8 +287,10 @@ class CephRBDImageDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephrbdimagedesiredstate", args=[self.pk])
 
 
-class CephRBDSnapshotDesiredState(NetBoxModel):
+class CephRBDSnapshotDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired intent for an RBD snapshot."""
+
+    intent_fields = ("parameters",)
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -297,8 +344,10 @@ class CephRBDSnapshotDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephrbdsnapshotdesiredstate", args=[self.pk])
 
 
-class CephRGWRealmDesiredState(NetBoxModel):
+class CephRGWRealmDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for an RGW realm."""
+
+    intent_fields = ("parameters",)
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -340,8 +389,10 @@ class CephRGWRealmDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephrgwrealmdesiredstate", args=[self.pk])
 
 
-class CephRGWZoneDesiredState(NetBoxModel):
+class CephRGWZoneDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for an RGW zone."""
+
+    intent_fields = ("endpoints", "placement_targets", "parameters")
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -401,8 +452,10 @@ class CephRGWZoneDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephrgwzonedesiredstate", args=[self.pk])
 
 
-class CephRGWUserDesiredState(NetBoxModel):
+class CephRGWUserDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for an RGW/S3 user."""
+
+    intent_fields = ("credential_ref", "parameters")
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",
@@ -457,8 +510,10 @@ class CephRGWUserDesiredState(NetBoxModel):
         return reverse("plugins:netbox_ceph:cephrgwuserdesiredstate", args=[self.pk])
 
 
-class CephRGWBucketDesiredState(NetBoxModel):
+class CephRGWBucketDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):
     """NetBox-defined desired configuration for an RGW/S3 bucket."""
+
+    intent_fields = ("lifecycle_policy", "parameters")
 
     cluster = models.ForeignKey(
         to="netbox_ceph.CephCluster",

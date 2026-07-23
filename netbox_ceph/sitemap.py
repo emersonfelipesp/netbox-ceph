@@ -90,6 +90,7 @@ _SECTIONS: list[tuple[str, list[tuple[str, str]]]] = [
             ("providers-list", "/plugins/ceph/providers/"),
             ("operations-list", "/plugins/ceph/operations/"),
             ("plans-list", "/plugins/ceph/plans/"),
+            ("operation-approvals-list", "/plugins/ceph/operation-approvals/"),
             ("validation-results-list", "/plugins/ceph/validation-results/"),
             ("operation-runs-list", "/plugins/ceph/operation-runs/"),
             ("drift-records-list", "/plugins/ceph/drift-records/"),

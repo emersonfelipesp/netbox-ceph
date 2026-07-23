@@ -2,51 +2,63 @@
 {% load helpers %}
 
 {% comment %}
-Adds Plan / Apply controls to the Ceph operation detail page. Apply only shows
-when the operation is planned; destructive or confirmation-required operations
-route through a confirmation modal that posts confirmed=true.
+Adds Plan / independent Approve & Apply controls to the operation detail page.
+The warning modal is presentation only; backend authority is always a canonical
+plan plus a different actor's one-time approval.
 {% endcomment %}
 
 {% block extra_controls %}
-  {% if perms.netbox_ceph.change_cephoperation %}
-    <form action="{% url 'plugins:netbox_ceph:cephoperation_plan' pk=object.pk %}" method="post" class="d-inline">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-sm btn-primary">
-        <i class="mdi mdi-clipboard-text-search-outline"></i> Plan
-      </button>
-    </form>
-    {% if object.status == 'planned' %}
+  {% if perms.netbox_ceph.request_cephoperation and perms.netbox_ceph.apply_cephoperation %}
+    {% if object.status == 'pending' or object.status == 'planned' or object.status == 'failed' or object.status == 'unsupported' %}
+      <form action="{% url 'plugins:netbox_ceph:cephoperation_plan' pk=object.pk %}" method="post" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="mdi mdi-clipboard-text-search-outline"></i> Plan
+        </button>
+      </form>
+    {% endif %}
+  {% endif %}
+  {% if perms.netbox_ceph.approve_cephoperation %}
+    {% if object.status == 'applying' or object.status == 'outcome_unknown' %}
+      <form action="{% url 'plugins:netbox_ceph:cephoperation_apply' pk=object.pk %}" method="post" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-warning">
+          <i class="mdi mdi-refresh"></i> Recover apply status
+        </button>
+      </form>
+    {% endif %}
+  {% endif %}
+  {% if perms.netbox_ceph.approve_cephoperation and object.status == 'planned' %}
       {% if object.is_destructive or object.confirmation_required %}
         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#ceph_apply_modal">
-          <i class="mdi mdi-play"></i> Apply&hellip;
+          <i class="mdi mdi-account-check"></i> Approve &amp; apply&hellip;
         </button>
       {% else %}
         <form action="{% url 'plugins:netbox_ceph:cephoperation_apply' pk=object.pk %}" method="post" class="d-inline">
           {% csrf_token %}
           <button type="submit" class="btn btn-sm btn-success">
-            <i class="mdi mdi-play"></i> Apply
+            <i class="mdi mdi-account-check"></i> Approve &amp; apply
           </button>
         </form>
       {% endif %}
-    {% endif %}
   {% endif %}
 {% endblock %}
 
 {% block modals %}
   {{ block.super }}
-  {% if perms.netbox_ceph.change_cephoperation and object.status == 'planned' %}
+  {% if perms.netbox_ceph.approve_cephoperation and object.status == 'planned' %}
     <div class="modal fade" id="ceph_apply_modal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Confirm apply</h5>
+            <h5 class="modal-title">Independent approval and apply</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <p>
               This operation is marked <strong>destructive</strong> or
-              confirmation-required. Applying it may delete or irreversibly change
-              Ceph resources on the target cluster.
+              confirmation-required. Your identity must differ from the requester;
+              approval is issued once and applied immediately without storing its token.
             </p>
             <p class="mb-0">Target: <code>{{ object.target_kind }}:{{ object.target_ref }}</code></p>
           </div>
@@ -54,9 +66,8 @@ route through a confirmation modal that posts confirmed=true.
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
             <form action="{% url 'plugins:netbox_ceph:cephoperation_apply' pk=object.pk %}" method="post" class="d-inline">
               {% csrf_token %}
-              <input type="hidden" name="confirmed" value="true">
               <button type="submit" class="btn btn-danger">
-                <i class="mdi mdi-play"></i> Confirm &amp; apply
+                <i class="mdi mdi-account-check"></i> Approve &amp; apply
               </button>
             </form>
           </div>

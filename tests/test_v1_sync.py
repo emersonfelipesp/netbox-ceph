@@ -128,9 +128,7 @@ def test_ceph_sync_job_enqueue_uses_keyword_args_and_persists_params(
     assert captured["cluster_pk"] == 7
     assert captured["job_timeout"] == jobs_module.CEPH_SYNC_JOB_TIMEOUT
     assert "instance" not in captured
-    assert job.data == {
-        "ceph_sync": {"params": {"resources": ["pools", "osds"], "cluster_pk": 7}}
-    }
+    assert job.data == {"ceph_sync": {"params": {"resources": ["pools", "osds"], "cluster_pk": 7}}}
     assert saves == [["data"]]
 
     with pytest.raises(TypeError):
@@ -427,6 +425,7 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
     status_mod = types.ModuleType("rest_framework.status")
     status_mod.HTTP_202_ACCEPTED = 202
     status_mod.HTTP_400_BAD_REQUEST = 400
+    status_mod.HTTP_403_FORBIDDEN = 403
     status_mod.HTTP_409_CONFLICT = 409
     status_mod.HTTP_502_BAD_GATEWAY = 502
     status_mod.HTTP_503_SERVICE_UNAVAILABLE = 503
@@ -436,7 +435,7 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
 
     decorators = types.ModuleType("rest_framework.decorators")
 
-    def action(*, detail, methods):
+    def action(*, detail, methods, **kwargs):
         def decorator(func):
             func.detail = detail
             func.methods = tuple(methods)
@@ -452,7 +451,11 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
     class MethodNotAllowed(Exception):
         pass
 
+    class PermissionDenied(Exception):
+        pass
+
     exceptions.MethodNotAllowed = MethodNotAllowed
+    exceptions.PermissionDenied = PermissionDenied
     monkeypatch.setitem(sys.modules, "rest_framework.exceptions", exceptions)
 
     response_mod = types.ModuleType("rest_framework.response")
@@ -468,8 +471,20 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
     netbox = types.ModuleType("netbox")
     netbox.__path__ = []
     netbox_api = types.ModuleType("netbox.api")
+    netbox_api.__path__ = []
+    authentication = types.ModuleType("netbox.api.authentication")
     netbox_plugins = types.ModuleType("netbox.plugins")
     viewsets = types.ModuleType("netbox.api.viewsets")
+
+    class TokenPermissions:
+        def has_permission(self, request, view):
+            return True
+
+        def has_object_permission(self, request, view, obj):
+            return True
+
+        def _verify_write_permission(self, request):
+            return True
 
     class NetBoxModelViewSet:
         def get_serializer_context(self):
@@ -480,11 +495,24 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
             return None
 
     netbox_plugins.PluginConfig = PluginConfig
+    authentication.TokenPermissions = TokenPermissions
     viewsets.NetBoxModelViewSet = NetBoxModelViewSet
     monkeypatch.setitem(sys.modules, "netbox", netbox)
     monkeypatch.setitem(sys.modules, "netbox.api", netbox_api)
+    monkeypatch.setitem(sys.modules, "netbox.api.authentication", authentication)
     monkeypatch.setitem(sys.modules, "netbox.plugins", netbox_plugins)
     monkeypatch.setitem(sys.modules, "netbox.api.viewsets", viewsets)
+
+    users = types.ModuleType("users")
+    users.__path__ = []
+    user_models = types.ModuleType("users.models")
+
+    class Token:
+        pass
+
+    user_models.Token = Token
+    monkeypatch.setitem(sys.modules, "users", users)
+    monkeypatch.setitem(sys.modules, "users.models", user_models)
 
     class _Manager:
         def all(self):
@@ -507,6 +535,7 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
         "CephHealthCheck",
         "CephMetricSnapshot",
         "CephOperation",
+        "CephOperationApproval",
         "CephOperationRun",
         "CephOSD",
         "CephPlan",
@@ -559,6 +588,7 @@ def api_views_module(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
             self.run = run
 
     operation_actions.OperationActionError = OperationActionError
+    operation_actions.approve_and_apply_operation = lambda *args, **kwargs: None
     operation_actions.apply_operation = lambda *args, **kwargs: None
     operation_actions.plan_operation = lambda *args, **kwargs: None
     operation_actions.reconcile_provider = lambda *args, **kwargs: None

@@ -12,7 +12,14 @@ from netbox_ceph.services import ceph_v2_responses as responses
 # The netbox CephOperationStatusChoices / CephPlanStatusChoices values the
 # mapper is allowed to produce (kept in sync with netbox_ceph/choices.py; the
 # Django contract test asserts these are real choices).
-_RUN_STATUS_VALUES = {"succeeded", "applying", "failed", "cancelled", "pending"}
+_RUN_STATUS_VALUES = {
+    "succeeded",
+    "applying",
+    "outcome_unknown",
+    "failed",
+    "cancelled",
+    "pending",
+}
 _PLAN_STATUS_VALUES = {"draft", "valid", "invalid", "applied", "stale"}
 
 _PLAN_RESPONSE = {
@@ -23,7 +30,12 @@ _PLAN_RESPONSE = {
         {"kind": "pool", "action": "delete", "target_ref": "old", "is_destructive": True},
     ],
     "blocked_actions": [
-        {"kind": "filesystem", "action": "delete", "target_ref": "fs1", "blocked_reason": "unsupported"}
+        {
+            "kind": "filesystem",
+            "action": "delete",
+            "target_ref": "fs1",
+            "blocked_reason": "unsupported",
+        }
     ],
     "validations": [{"severity": "info", "code": "ok", "message": "fine"}],
     "warnings": ["recovery in progress"],
@@ -50,12 +62,23 @@ def test_run_status_map_targets_are_valid_choice_values() -> None:
 def test_map_run_status_covers_proxbox_statuses() -> None:
     assert responses.map_run_status("completed") == "succeeded"
     assert responses.map_run_status("running") == "applying"
+    assert responses.map_run_status("dispatching") == "applying"
     assert responses.map_run_status("blocked") == "failed"
     assert responses.map_run_status("failed") == "failed"
     assert responses.map_run_status("cancelled") == "cancelled"
     assert responses.map_run_status("ok") == "succeeded"  # legacy
     assert responses.map_run_status("weird-unknown") is None
     assert responses.map_run_status(None) is None
+
+
+def test_blocked_actions_make_plan_invalid() -> None:
+    assert (
+        responses.plan_status_value(
+            {"blocked_actions": [{"kind": "pool", "action": "delete"}]},
+            valid_choices={"valid", "invalid"},
+        )
+        == "invalid"
+    )
 
 
 def test_provider_task_ref_joins_list() -> None:
@@ -117,7 +140,9 @@ def test_plan_fields_prefers_explicit_legacy_fields() -> None:
 
 def test_plan_status_value_invalid_on_error_validation() -> None:
     valid = {"valid", "invalid", "draft", "applied", "stale"}
-    assert responses.plan_status_value(_PLAN_RESPONSE, valid_choices=valid) == "valid"
+    unblocked = dict(_PLAN_RESPONSE, blocked_actions=[])
+    assert responses.plan_status_value(unblocked, valid_choices=valid) == "valid"
+    assert responses.plan_status_value(_PLAN_RESPONSE, valid_choices=valid) == "invalid"
     with_error = dict(_PLAN_RESPONSE, validations=[{"severity": "error", "message": "bad"}])
     assert responses.plan_status_value(with_error, valid_choices=valid) == "invalid"
     explicit = {"status": "applied", "validations": []}

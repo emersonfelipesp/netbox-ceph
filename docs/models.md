@@ -209,11 +209,19 @@ held by proxbox-api.
 ### CephOperation
 
 Requested control-plane action. Stores the target kind, target reference,
-operation type, and desired payload. Drives the plan/apply workflow.
+operation type, exact Proxmox execution node, and desired payload. Drives the
+plan/apply workflow.
 
 ### CephPlan
 
-Provider-generated preview of what a `CephOperation` would do.
+Provider-generated preview of what a `CephOperation` would do, bound to backend
+and plugin endpoints, provider identity/kind, execution node, request digest,
+endpoint revision, and a secret-free local-configuration digest.
+
+### CephOperationApproval
+
+Token-free independent-approval audit row. An expiring unique issuance-owner
+lease serializes the backend approval POST; no approval token or hash is stored.
 
 ### CephValidationResult
 
@@ -222,7 +230,8 @@ Plan-stage findings attached to a `CephPlan`.
 ### CephOperationRun
 
 Audit record for each backend apply attempt, including task references and
-status.
+status. The optional historical link is database-enforced one-to-one for every
+approval-backed run.
 
 ### CephDriftRecord
 

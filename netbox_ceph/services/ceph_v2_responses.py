@@ -27,7 +27,10 @@ RUN_STATUS_MAP: dict[str, str] = {
     "ok": "succeeded",
     "succeeded": "succeeded",
     "running": "applying",
+    "dispatching": "applying",
     "applying": "applying",
+    "submitted": "applying",
+    "outcome_unknown": "outcome_unknown",
     "failed": "failed",
     "blocked": "failed",
     "cancelled": "cancelled",
@@ -134,6 +137,9 @@ def plan_status_value(payload: dict[str, Any], *, valid_choices: set[str]) -> st
     if isinstance(explicit, str) and explicit in valid_choices:
         return explicit
     validations = payload.get("validations", [])
+    blocked_actions = payload.get("blocked_actions", [])
+    if isinstance(blocked_actions, list) and blocked_actions:
+        return PLAN_STATUS_INVALID
     if isinstance(validations, list) and any(
         isinstance(item, dict) and item.get("severity") == "error" for item in validations
     ):

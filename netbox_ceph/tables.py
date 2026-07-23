@@ -17,6 +17,7 @@ from netbox_ceph.models import (
     CephHealthCheck,
     CephMetricSnapshot,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephOSD,
     CephPlan,
@@ -602,11 +603,13 @@ class CephOperationTable(NetBoxTable):
             "operation_type",
             "target_kind",
             "target_ref",
+            "execution_node",
             "status",
             "is_destructive",
             "confirmation_required",
             "confirmed",
             "requested_by",
+            "requested_by_username",
             "source_branch_schema_id",
             "created",
             "last_updated",
@@ -638,7 +641,17 @@ class CephPlanTable(NetBoxTable):
             "status",
             "summary",
             "provider_target",
+            "backend_plan_id",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
             "is_destructive",
+            "requester_username",
+            "expires_at",
             "generated_at",
             "created",
             "last_updated",
@@ -676,10 +689,52 @@ class CephValidationResultTable(NetBoxTable):
         default_columns = ("severity", "code", "message", "target", "operation")
 
 
+class CephOperationApprovalTable(NetBoxTable):
+    operation = tables.Column(linkify=True)
+    plan = tables.Column(linkify=True)
+
+    class Meta(NetBoxTable.Meta):
+        model = CephOperationApproval
+        fields = (
+            "pk",
+            "id",
+            "operation",
+            "plan",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
+            "requester",
+            "requester_username",
+            "approver",
+            "approver_username",
+            "status",
+            "backend_approval_id",
+            "backend_run_id",
+            "expires_at",
+            "created",
+            "last_updated",
+            "actions",
+        )
+        default_columns = (
+            "operation",
+            "plan",
+            "requester_username",
+            "approver_username",
+            "status",
+            "backend_run_id",
+            "created",
+        )
+
+
 class CephOperationRunTable(NetBoxTable):
     operation = tables.Column(linkify=True)
     plan = tables.Column(linkify=True)
     provider = tables.Column(linkify=True)
+    approval = tables.Column(linkify=True)
 
     class Meta(NetBoxTable.Meta):
         model = CephOperationRun
@@ -689,10 +744,20 @@ class CephOperationRunTable(NetBoxTable):
             "operation",
             "plan",
             "provider",
+            "approval",
             "status",
             "actor",
+            "actor_username",
             "source_branch_schema_id",
             "provider_task_ref",
+            "backend_run_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
+            "outcome_unknown",
             "started_at",
             "finished_at",
             "created",

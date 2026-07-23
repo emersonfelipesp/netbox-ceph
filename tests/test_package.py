@@ -46,7 +46,7 @@ def test_pyproject_certification_metadata() -> None:
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert "License :: OSI Approved :: Apache Software License" not in project["classifiers"]
-    assert "netbox-proxbox>=0.0.18,<0.1.0" in project["dependencies"]
+    assert "netbox-proxbox>=0.0.23.post2,<0.1.0" in project["dependencies"]
     assert project["urls"]["Documentation"] == "https://emersonfelipesp.github.io/netbox-ceph/"
     assert (ROOT / "LICENSE").is_file()
 
@@ -62,9 +62,7 @@ def test_package_metadata_version() -> None:
 
 
 def test_e2e_workflow_covers_supported_netbox_versions() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "e2e.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = (ROOT / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
 
     for image in SUPPORTED_NETBOX_IMAGES:
         assert image in workflow

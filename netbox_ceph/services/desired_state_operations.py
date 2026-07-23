@@ -14,13 +14,23 @@ and persists a ``CephOperation`` the existing plan/apply engine consumes.
 ``operation_type`` defaults to ``reconcile``: the proxbox-api Proxmox adapter
 ``diff()`` treats any non-delete action as "ensure" and resolves
 create/update/noop from live state, so a generated reconcile operation is never
-destructive. Desired-state rows never carry secrets; RGW user keys live behind
-the opaque ``credential_ref`` that proxbox-api resolves.
+destructive. Only desired-state kinds implemented by the Proxmox Ceph writer
+may generate operations. Unsupported RBD/RGW intent remains browsable in
+NetBox, but cannot cross the write boundary.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable
+
+from netbox_ceph.services.redaction import validate_secret_free_intent
+
+CEPH_WRITE_CONTRACT_VERSION = "proxbox-ceph-v2-2026-07"
+
+
+class DesiredStateContractError(ValueError):
+    """Desired intent cannot be represented by the strict Proxmox writer."""
+
 
 # NOTE: keep the module top-level Django-free so the pure payload/target builders
 # import without a NetBox runtime (CI runs them as plain pytest). NetBox imports
@@ -40,45 +50,107 @@ def _clean(payload: dict[str, Any]) -> dict[str, Any]:
     ``parameters`` overrides.
     """
 
+    validate_secret_free_intent(payload)
     params = payload.pop("parameters", None)
     result = {key: value for key, value in payload.items() if value not in (None, "", [], {})}
     if isinstance(params, dict):
         for key, value in params.items():
             result.setdefault(str(key), value)
+    validate_secret_free_intent(result)
     return result
 
 
+def _strict_payload(
+    payload: dict[str, Any],
+    *,
+    allowed: frozenset[str],
+    target_kind: str,
+) -> dict[str, Any]:
+    """Reject keys the strict proxbox-api writer would otherwise block later."""
+
+    result = _clean(payload)
+    unknown = sorted(set(result).difference(allowed))
+    if unknown:
+        rendered = ", ".join(unknown)
+        raise DesiredStateContractError(f"Unsupported {target_kind} write field(s): {rendered}.")
+    return result
+
+
+_POOL_WRITE_FIELDS = frozenset(
+    {
+        "add_storages",
+        "application",
+        "crush_rule",
+        "erasure_coding",
+        "min_size",
+        "pg_autoscale_mode",
+        "pg_num",
+        "pg_num_min",
+        "size",
+        "target_size",
+        "target_size_ratio",
+    }
+)
+_FILESYSTEM_WRITE_FIELDS = frozenset({"add_storage", "pg_num"})
+
+
 def _pool_payload(values: dict[str, Any]) -> dict[str, Any]:
-    return _clean(
+    unsupported = {
+        "quota_max_bytes": values.get("quota_max_bytes"),
+        "quota_max_objects": values.get("quota_max_objects"),
+        "compression_mode": (
+            values.get("compression_mode")
+            if values.get("compression_mode") not in (None, "", "none")
+            else None
+        ),
+    }
+    requested_unsupported = sorted(key for key, value in unsupported.items() if value is not None)
+    if requested_unsupported:
+        raise DesiredStateContractError(
+            "Unsupported pool write field(s): " + ", ".join(requested_unsupported) + "."
+        )
+    return _strict_payload(
         {
-            "name": values.get("name"),
             "size": values.get("size"),
             "min_size": values.get("min_size"),
             "pg_autoscale_mode": values.get("pg_autoscale_mode"),
             "crush_rule": values.get("crush_rule_name"),
             "application": values.get("application"),
             "target_size_ratio": values.get("target_size_ratio"),
-            "quota_max_bytes": values.get("quota_max_bytes"),
-            "quota_max_objects": values.get("quota_max_objects"),
-            "compression_mode": values.get("compression_mode"),
-            "erasure_code_profile": values.get("erasure_code_profile"),
+            "erasure_coding": values.get("erasure_code_profile"),
             "parameters": values.get("parameters"),
-        }
+        },
+        allowed=_POOL_WRITE_FIELDS,
+        target_kind="pool",
     )
 
 
 def _filesystem_payload(values: dict[str, Any]) -> dict[str, Any]:
-    return _clean(
+    unsupported = {
+        "metadata_pool": values.get("metadata_pool_name"),
+        "data_pools": values.get("data_pools"),
+        "mds_placement": values.get("mds_placement"),
+        "standby_count": (
+            values.get("standby_count") if values.get("standby_count") not in (None, 1) else None
+        ),
+        "max_mds": values.get("max_mds") if values.get("max_mds") not in (None, 1) else None,
+        "quota_max_bytes": values.get("quota_max_bytes"),
+    }
+    requested_unsupported = sorted(
+        key for key, value in unsupported.items() if value not in (None, "", [], {})
+    )
+    if requested_unsupported:
+        raise DesiredStateContractError(
+            "Unsupported filesystem write field(s): " + ", ".join(requested_unsupported) + "."
+        )
+    return _strict_payload(
         {
-            "name": values.get("name"),
-            "metadata_pool": values.get("metadata_pool_name"),
-            "data_pools": values.get("data_pools"),
-            "mds_placement": values.get("mds_placement"),
-            "standby_count": values.get("standby_count"),
-            "max_mds": values.get("max_mds"),
-            "quota_max_bytes": values.get("quota_max_bytes"),
+            "pg_num": values.get("pg_num"),
+            "add_storage": values.get("add_storage"),
             "parameters": values.get("parameters"),
-        }
+        },
+        allowed=_FILESYSTEM_WRITE_FIELDS,
+        target_kind="filesystem",
     )
 
 
@@ -213,17 +285,24 @@ class _Spec:
         self.payload_fn = payload_fn
 
 
-# Keyed by desired-state model class name.
+# Keyed by desired-state model class name. Only the kinds present in #258's
+# strict Proxmox writer are enabled. The remaining desired-state models are
+# intentionally not mapped to a write request.
 SPECS: dict[str, _Spec] = {
     "CephPoolDesiredState": _Spec("pool", _pool_ref, _pool_payload),
     "CephFilesystemDesiredState": _Spec("filesystem", _filesystem_ref, _filesystem_payload),
-    "CephRBDImageDesiredState": _Spec("rbd_image", _rbd_image_ref, _rbd_image_payload),
-    "CephRBDSnapshotDesiredState": _Spec("rbd_snapshot", _rbd_snapshot_ref, _rbd_snapshot_payload),
-    "CephRGWRealmDesiredState": _Spec("rgw_realm", _name_ref, _rgw_realm_payload),
-    "CephRGWZoneDesiredState": _Spec("rgw_zone", _name_ref, _rgw_zone_payload),
-    "CephRGWUserDesiredState": _Spec("rgw_user", _uid_ref, _rgw_user_payload),
-    "CephRGWBucketDesiredState": _Spec("rgw_bucket", _name_ref, _rgw_bucket_payload),
 }
+
+_KNOWN_UNSUPPORTED_MODELS = frozenset(
+    {
+        "CephRBDImageDesiredState",
+        "CephRBDSnapshotDesiredState",
+        "CephRGWRealmDesiredState",
+        "CephRGWZoneDesiredState",
+        "CephRGWUserDesiredState",
+        "CephRGWBucketDesiredState",
+    }
+)
 
 
 def supported_models() -> tuple[str, ...]:
@@ -239,10 +318,15 @@ def build_request(model_name: str, values: dict[str, Any]) -> dict[str, Any]:
     resolved to their name/uid). Raises ``KeyError`` for an unknown model.
     """
 
+    if model_name in _KNOWN_UNSUPPORTED_MODELS:
+        raise DesiredStateContractError(
+            f"{model_name} is not supported by the Proxmox Ceph v2 write adapter."
+        )
     spec = SPECS[model_name]
     return {
         "target_kind": spec.target_kind,
         "target_ref": spec.ref_fn(values),
+        "execution_node": str(values.get("execution_node") or ""),
         "desired": spec.payload_fn(values),
     }
 
@@ -275,6 +359,7 @@ def _instance_values(instance: Any) -> dict[str, Any]:
     if name == "CephPoolDesiredState":
         values = {
             "name": instance.name,
+            "execution_node": instance.execution_node,
             "size": instance.size,
             "min_size": instance.min_size,
             "pg_autoscale_mode": instance.pg_autoscale_mode,
@@ -290,11 +375,14 @@ def _instance_values(instance: Any) -> dict[str, Any]:
     elif name == "CephFilesystemDesiredState":
         values = {
             "name": instance.name,
+            "execution_node": instance.execution_node,
             "metadata_pool_name": _related_name(instance.metadata_pool),
             "data_pools": instance.data_pools,
             "mds_placement": instance.mds_placement,
             "standby_count": instance.standby_count,
             "max_mds": instance.max_mds,
+            "pg_num": instance.pg_num,
+            "add_storage": instance.add_storage,
             "quota_max_bytes": instance.quota_max_bytes,
             "parameters": instance.parameters,
         }
@@ -379,21 +467,41 @@ def build_operation(instance: Any, *, requested_by: Any = None) -> Any:
     existing plan/apply engine can preview and execute.
     """
 
+    from django.db import transaction
+
     from netbox_ceph.choices import CephOperationTypeChoices
     from netbox_ceph.models import CephOperation
+    from netbox_ceph.services.operation_actions import (
+        _APPLY_PERMISSION,
+        _REQUEST_PERMISSION,
+        _require_permission,
+    )
 
     model_name = type(instance).__name__
     request = build_request(model_name, _instance_values(instance))
+    get_username = getattr(requested_by, "get_username", None)
+    requested_by_username = str(
+        get_username() if callable(get_username) else getattr(requested_by, "username", "")
+    ).strip()
     operation = CephOperation(
         cluster=instance.cluster,
         provider=instance.provider,
         operation_type=CephOperationTypeChoices.TYPE_RECONCILE,
         target_kind=request["target_kind"],
         target_ref=request["target_ref"],
+        execution_node=request["execution_node"],
         desired=request["desired"],
         is_destructive=False,
         confirmation_required=False,
         requested_by=requested_by,
+        requested_by_username=requested_by_username,
     )
-    operation.save()
+    # The operation must be persisted before NetBox can evaluate constrained
+    # ObjectPermissions. Keep creation and both checks in one transaction so a
+    # split request/apply scope can never leave an unauthorized row behind.
+    with transaction.atomic():
+        operation.full_clean()
+        operation.save()
+        _require_permission(requested_by, _REQUEST_PERMISSION, operation)
+        _require_permission(requested_by, _APPLY_PERMISSION, operation)
     return operation

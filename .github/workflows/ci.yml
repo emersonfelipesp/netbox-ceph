@@ -12,29 +12,42 @@ permissions:
 jobs:
   lint-and-test:
     name: lint + tests / py${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      - name: Check out the minimum compatible netbox-proxbox contract
+        env:
+          NETBOX_PROXBOX_SHA: 82feea3b8ea875121dee7731c96be76fe2931611
+        run: |
+          git clone --no-checkout https://github.com/emersonfelipesp/netbox-proxbox.git netbox-proxbox
+          git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"
+          test "$(git -C netbox-proxbox rev-parse HEAD)" = "$NETBOX_PROXBOX_SHA"
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[test]"
-          python -m pip install ruff
+          python -m pip install -e ./netbox-proxbox
+          python -m pip install -e . --no-deps
+          python -m pip install "pytest==9.0.3" "pytest-cov==7.1.0" "ruff==0.15.8"
 
       - name: Ruff
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Compile
         run: python -m compileall netbox_ceph tests
@@ -44,6 +57,93 @@ jobs:
 
       - name: Build and validate package metadata
         run: |
-          python -m pip install build twine
+          python -m pip install "build==1.5.0" "twine==6.2.0"
           python -m build
           python -m twine check dist/*
+
+  postgres-state-machine:
+    name: PostgreSQL authority state machine / NetBox ${{ matrix.netbox-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - netbox-version: "v4.5.8"
+            netbox-ref: 75e1b86613792458b4d4c8d0cbbfc94df16cfaaf
+          - netbox-version: "v4.6.4"
+            netbox-ref: 3d73b2a1669ad03c9f0ccb1332fe201d60cbce9e
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        env:
+          POSTGRES_USER: netbox
+          POSTGRES_PASSWORD: netbox
+          POSTGRES_DB: netbox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netbox"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout netbox-ceph
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Checkout NetBox ${{ matrix.netbox-version }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: netbox-community/netbox
+          ref: ${{ matrix.netbox-ref }}
+          path: netbox
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Check out the exact netbox-proxbox authority contract
+        env:
+          NETBOX_PROXBOX_SHA: 82feea3b8ea875121dee7731c96be76fe2931611
+        run: |
+          git clone --no-checkout https://github.com/emersonfelipesp/netbox-proxbox.git netbox-proxbox
+          git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"
+          test "$(git -C netbox-proxbox rev-parse HEAD)" = "$NETBOX_PROXBOX_SHA"
+
+      - name: Install the real NetBox test stack
+        run: |
+          python -m pip install -r netbox/requirements.txt
+          python -m pip install -e ./netbox-proxbox
+          python -m pip install -e . --no-deps
+          python -m pip install "pytest==9.0.3" "pytest-django==4.12.0"
+
+      - name: Check schema and run PostgreSQL authority tests
+        env:
+          DJANGO_SETTINGS_MODULE: netbox.settings
+          NETBOX_CONFIGURATION: tests.netbox_test_configuration
+          NETBOX_TEST_DB_HOST: 127.0.0.1
+          NETBOX_TEST_DB_PORT: 5432
+          NETBOX_TEST_REDIS_HOST: 127.0.0.1
+          NETBOX_TEST_REDIS_PORT: 6379
+          PYTHONPATH: ${{ github.workspace }}/netbox/netbox:${{ github.workspace }}/netbox-proxbox:${{ github.workspace }}
+        run: |
+          python netbox/netbox/manage.py check
+          python netbox/netbox/manage.py makemigrations netbox_ceph --check --dry-run
+          python -m pytest -q --reuse-db \
+            tests/test_operation_state_machine_django.py \
+            tests/test_v2_actions.py \
+            tests/test_v2_netbox_contract.py

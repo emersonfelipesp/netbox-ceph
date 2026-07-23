@@ -136,6 +136,7 @@ class CephOperationStatusChoices(ChoiceSet):
     STATUS_PLANNED = "planned"
     STATUS_AWAITING_CONFIRMATION = "awaiting_confirmation"
     STATUS_APPLYING = "applying"
+    STATUS_OUTCOME_UNKNOWN = "outcome_unknown"
     STATUS_SUCCEEDED = "succeeded"
     STATUS_FAILED = "failed"
     STATUS_CANCELLED = "cancelled"
@@ -147,6 +148,7 @@ class CephOperationStatusChoices(ChoiceSet):
         (STATUS_PLANNED, _("Planned"), "cyan"),
         (STATUS_AWAITING_CONFIRMATION, _("Awaiting confirmation"), "yellow"),
         (STATUS_APPLYING, _("Applying"), "purple"),
+        (STATUS_OUTCOME_UNKNOWN, _("Outcome unknown"), "orange"),
         (STATUS_SUCCEEDED, _("Succeeded"), "green"),
         (STATUS_FAILED, _("Failed"), "red"),
         (STATUS_CANCELLED, _("Cancelled"), "gray"),
@@ -171,6 +173,30 @@ class CephPlanStatusChoices(ChoiceSet):
         (STATUS_INVALID, _("Invalid"), "red"),
         (STATUS_APPLIED, _("Applied"), "blue"),
         (STATUS_STALE, _("Stale"), "yellow"),
+    ]
+
+
+class CephApprovalStatusChoices(ChoiceSet):
+    """Local audit state for a backend-issued Ceph plan approval."""
+
+    key = "CephOperationApproval.status"
+
+    STATUS_ISSUING = "issuing"
+    STATUS_ISSUED = "issued"
+    STATUS_APPLYING = "applying"
+    STATUS_CONSUMED = "consumed"
+    STATUS_OUTCOME_UNKNOWN = "outcome_unknown"
+    STATUS_FAILED = "failed"
+    STATUS_EXPIRED = "expired"
+
+    CHOICES = [
+        (STATUS_ISSUING, _("Issuing"), "blue"),
+        (STATUS_ISSUED, _("Issued"), "cyan"),
+        (STATUS_APPLYING, _("Applying"), "purple"),
+        (STATUS_CONSUMED, _("Consumed"), "green"),
+        (STATUS_OUTCOME_UNKNOWN, _("Outcome unknown"), "orange"),
+        (STATUS_FAILED, _("Failed"), "red"),
+        (STATUS_EXPIRED, _("Expired"), "gray"),
     ]
 
 

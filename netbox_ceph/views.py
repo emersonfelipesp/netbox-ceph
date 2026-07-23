@@ -7,11 +7,13 @@ All inventory models are exposed as read-only object/list views in v1. Only
 from __future__ import annotations
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 from django.views.generic import TemplateView
 from netbox.views import generic
+from utilities.permissions import resolve_permission
 from utilities.views import (
     ContentTypePermissionRequiredMixin,
     ViewTab,
@@ -19,7 +21,7 @@ from utilities.views import (
 )
 
 from netbox_ceph import filtersets, forms, tables
-from netbox_ceph.choices import CephDriftStatusChoices
+from netbox_ceph.choices import CephDriftStatusChoices, CephOperationStatusChoices
 from netbox_ceph.models import (
     CephCluster,
     CephCrushRule,
@@ -31,6 +33,7 @@ from netbox_ceph.models import (
     CephHealthCheck,
     CephMetricSnapshot,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephOSD,
     CephPlan,
@@ -58,20 +61,14 @@ from netbox_ceph.models import (
 from netbox_ceph.services.desired_state_operations import build_operation
 from netbox_ceph.services.operation_actions import (
     OperationActionError,
-    apply_operation,
+    approve_and_apply_operation,
     plan_operation,
     reconcile_provider,
 )
 
-_DESIRED_STATE_MODELS = (
+_OPERATION_GENERATING_DESIRED_STATE_MODELS = (
     CephPoolDesiredState,
     CephFilesystemDesiredState,
-    CephRBDImageDesiredState,
-    CephRBDSnapshotDesiredState,
-    CephRGWRealmDesiredState,
-    CephRGWZoneDesiredState,
-    CephRGWUserDesiredState,
-    CephRGWBucketDesiredState,
 )
 
 
@@ -363,33 +360,102 @@ _register_writable(
     forms.CephProviderFilterForm,
     forms.CephProviderForm,
 )
-_register_writable(
-    CephOperation,
-    tables.CephOperationTable,
-    filtersets.CephOperationFilterSet,
-    forms.CephOperationFilterForm,
-    forms.CephOperationForm,
-)
-_register_writable(
+
+
+@register_model_view(CephOperation)
+class CephOperationView(generic.ObjectView):
+    queryset = CephOperation.objects.all()
+
+
+@register_model_view(CephOperation, "list", path="", detail=False)
+class CephOperationListView(generic.ObjectListView):
+    queryset = CephOperation.objects.all()
+    table = tables.CephOperationTable
+    filterset = filtersets.CephOperationFilterSet
+    filterset_form = forms.CephOperationFilterForm
+
+
+@register_model_view(CephOperation, "add", detail=False)
+@register_model_view(CephOperation, "edit")
+class CephOperationEditView(generic.ObjectEditView):
+    queryset = CephOperation.objects.all()
+    form = forms.CephOperationForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if not kwargs:
+            # ObjectEditView validates the saved row against ``self.queryset``
+            # inside its transaction. Intersect both custom permission scopes
+            # here so request/apply cannot be granted on different clusters.
+            self.queryset = (
+                CephOperation.objects.restrict(request.user, "request")
+                .restrict(request.user, "apply")
+                .all()
+            )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_required_permission(self) -> str:
+        if self._permission_action == "add":
+            return "netbox_ceph.request_cephoperation"
+        return super().get_required_permission()
+
+    def alter_object(self, obj, request, url_args, url_kwargs):
+        if obj.pk is None:
+            obj.requested_by = request.user
+            obj.requested_by_username = request.user.get_username()
+            obj.status = CephOperationStatusChoices.STATUS_PENDING
+            obj.confirmed = False
+            return obj
+        if (
+            obj.status != CephOperationStatusChoices.STATUS_PENDING
+            or obj.plans.exists()
+            or obj.approvals.exists()
+            or obj.runs.exists()
+        ):
+            raise PermissionDenied(
+                "Operations become immutable after planning or audit evidence exists."
+            )
+        return obj
+
+
+@register_model_view(CephOperation, "delete")
+class CephOperationDeleteView(generic.ObjectDeleteView):
+    queryset = CephOperation.objects.all()
+
+    def get_object(self, **kwargs):
+        obj = super().get_object(**kwargs)
+        if (
+            obj.status != CephOperationStatusChoices.STATUS_PENDING
+            or obj.plans.exists()
+            or obj.approvals.exists()
+            or obj.runs.exists()
+        ):
+            raise PermissionDenied("Only untouched pending operation requests may be deleted.")
+        return obj
+
+
+_register_readonly(
     CephPlan,
     tables.CephPlanTable,
     filtersets.CephPlanFilterSet,
     forms.CephPlanFilterForm,
-    forms.CephPlanForm,
 )
-_register_writable(
+_register_readonly(
     CephValidationResult,
     tables.CephValidationResultTable,
     filtersets.CephValidationResultFilterSet,
     forms.CephValidationResultFilterForm,
-    forms.CephValidationResultForm,
 )
-_register_writable(
+_register_readonly(
+    CephOperationApproval,
+    tables.CephOperationApprovalTable,
+    filtersets.CephOperationApprovalFilterSet,
+    forms.CephOperationApprovalFilterForm,
+)
+_register_readonly(
     CephOperationRun,
     tables.CephOperationRunTable,
     filtersets.CephOperationRunFilterSet,
     forms.CephOperationRunFilterForm,
-    forms.CephOperationRunForm,
 )
 _register_readonly(
     CephDriftRecord,
@@ -482,6 +548,7 @@ class _PostActionView(ContentTypePermissionRequiredMixin, View):
     model = None
     permission = ""
     action_label = "Action"
+    object_permissions: tuple[str, ...] = ()
 
     def get_required_permission(self) -> str:
         return self.permission
@@ -492,7 +559,11 @@ class _PostActionView(ContentTypePermissionRequiredMixin, View):
         raise NotImplementedError
 
     def post(self, request, *args, **kwargs):
-        obj = get_object_or_404(self.model, pk=kwargs["pk"])
+        queryset = self.model.objects.all()
+        for permission in self.object_permissions:
+            action = resolve_permission(permission)[1]
+            queryset = queryset.restrict(request.user, action)
+        obj = get_object_or_404(queryset, pk=kwargs["pk"])
         try:
             message, redirect_url = self.perform(request, obj)
         except OperationActionError as exc:
@@ -505,7 +576,12 @@ class _PostActionView(ContentTypePermissionRequiredMixin, View):
 @register_model_view(CephOperation, "plan", path="plan")
 class CephOperationPlanView(_PostActionView):
     model = CephOperation
-    permission = "netbox_ceph.change_cephoperation"
+    permission = "netbox_ceph.request_cephoperation"
+    additional_permissions = ("netbox_ceph.apply_cephoperation",)
+    object_permissions = (
+        "netbox_ceph.request_cephoperation",
+        "netbox_ceph.apply_cephoperation",
+    )
     action_label = "Plan"
 
     def perform(self, request, obj) -> tuple[str, str]:
@@ -516,19 +592,20 @@ class CephOperationPlanView(_PostActionView):
 @register_model_view(CephOperation, "apply", path="apply")
 class CephOperationApplyView(_PostActionView):
     model = CephOperation
-    permission = "netbox_ceph.change_cephoperation"
-    action_label = "Apply"
+    permission = "netbox_ceph.approve_cephoperation"
+    object_permissions = ("netbox_ceph.approve_cephoperation",)
+    action_label = "Approve and apply"
 
     def perform(self, request, obj) -> tuple[str, str]:
-        confirmed = request.POST.get("confirmed") in ("true", "True", "on", "1")
-        run = apply_operation(obj, actor=_action_user(request), confirmed=confirmed)
-        return f"Apply finished with status “{run.status}”.", obj.get_absolute_url()
+        run = approve_and_apply_operation(obj, approver=_action_user(request))
+        return f"Approval/apply finished with status “{run.status}”.", obj.get_absolute_url()
 
 
 @register_model_view(CephProvider, "reconcile", path="reconcile")
 class CephProviderReconcileView(_PostActionView):
     model = CephProvider
     permission = "netbox_ceph.change_cephprovider"
+    object_permissions = ("netbox_ceph.change_cephprovider",)
     action_label = "Reconcile"
 
     def perform(self, request, obj) -> tuple[str, str]:
@@ -539,15 +616,24 @@ class CephProviderReconcileView(_PostActionView):
 class _GenerateOperationView(_PostActionView):
     """Generate a CephOperation from a desired-state row, then open it."""
 
-    permission = "netbox_ceph.add_cephoperation"
+    permission = "netbox_ceph.request_cephoperation"
     action_label = "Generate operation"
 
     def perform(self, request, obj) -> tuple[str, str]:
+        if not request.user.has_perms(
+            (
+                "netbox_ceph.request_cephoperation",
+                "netbox_ceph.apply_cephoperation",
+            )
+        ):
+            raise PermissionDenied(
+                "Generating a Ceph operation requires request and apply permissions."
+            )
         operation = build_operation(obj, requested_by=_action_user(request))
         return "Operation generated from desired state.", operation.get_absolute_url()
 
 
-for _ds_model in _DESIRED_STATE_MODELS:
+for _ds_model in _OPERATION_GENERATING_DESIRED_STATE_MODELS:
     _view_cls = type(
         f"{_ds_model.__name__}GenerateOperationView",
         (_GenerateOperationView,),
