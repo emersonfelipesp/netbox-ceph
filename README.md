@@ -35,23 +35,13 @@ apply run through the orchestrator.
 
 ## Included Models
 
-- Ceph clusters
-- Ceph daemons
-- Ceph OSDs
-- Ceph pools
-- Ceph filesystems
-- Ceph CRUSH rules
-- Ceph flags
-- Ceph health checks
-- Ceph plugin settings
-- Ceph pool desired state (v2)
-- Ceph filesystem desired state (v2)
-- Ceph RBD image desired state (v2)
-- Ceph RBD snapshot desired state (v2)
-- Ceph RGW realm desired state (v2)
-- Ceph RGW zone desired state (v2)
-- Ceph RGW user desired state (v2)
-- Ceph RGW bucket desired state (v2)
+`netbox-ceph` ships v1 reflected inventory (clusters, daemons, OSDs, pools,
+filesystems, CRUSH rules, flags, health checks, plugin settings, and
+read-only RGW/S3 and RBD reflected inventory), plus v2 desired-state and
+control-plane models (providers, operations, plans, validation results,
+operation runs, drift records, metric snapshots). See
+[`docs/models.md`](https://emersonfelipesp.github.io/netbox-ceph/models/) for
+the full, authoritative model list and field reference.
 
 ## Compatibility
 
@@ -79,8 +69,9 @@ python manage.py migrate
 ```
 
 Out of scope for v1: direct Ceph Dashboard API integration, Prometheus metric
-ingestion, RGW/S3 bucket inventory, RBD image inventory, external non-Proxmox
-Ceph clusters, and all NetBox-to-Ceph write operations.
+ingestion, external non-Proxmox Ceph clusters, and NetBox-to-Ceph write
+operations for reflected inventory (RGW/S3 and RBD objects are read-only
+reflected inventory in v1; see [`docs/models.md`](https://emersonfelipesp.github.io/netbox-ceph/models/)).
 
 ## Documentation
 

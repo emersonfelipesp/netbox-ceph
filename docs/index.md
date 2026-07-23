@@ -24,7 +24,7 @@ relationships, and job conventions.
 
 - Direct Ceph Dashboard API integration
 - Prometheus metric ingestion
-- RGW / S3 bucket inventory
-- RBD image inventory
 - External non-Proxmox Ceph clusters
-- All NetBox-to-Ceph write operations
+- NetBox-to-Ceph write operations for reflected inventory (RGW/S3 and RBD
+  objects are read-only reflected inventory in v1 — see [Models](models.md)
+  for the full `CephRGW*`/`CephRBD*` model list)
