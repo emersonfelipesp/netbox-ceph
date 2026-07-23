@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('extras', '0138_customfieldchoiceset_choice_colors'),
+        ('extras', '0134_owner'),
         ('netbox_ceph', '0005_cephrgwrealmdesiredstate_cephrgwuserdesiredstate_and_more'),
         ('netbox_proxbox', '0004_fastapiendpoint_netboxendpoint_proxmoxendpoint_and_more'),
     ]
