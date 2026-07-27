@@ -107,6 +107,7 @@ Ceph v2 adds a separate NetBox control-plane foundation:
 - `CephProvider` records backend/provider references and capability metadata.
 - `CephOperation` records requested desired-state actions.
 - `CephPlan` records provider-generated previews.
+- `CephOperationApproval` records token-free independent approval authority.
 - `CephValidationResult` records plan findings.
 - `CephOperationRun` records apply attempts and backend task references.
 - `CephDriftRecord` records desired-vs-actual comparison state.
@@ -125,11 +126,13 @@ models are the NetBox-first, operator-editable source of intent:
 - `CephPoolDesiredState` — desired RADOS pool config: `size`, `min_size`,
   `pg_autoscale_mode`, `crush_rule_name`, `application`, `target_size_ratio`,
   quotas (`quota_max_bytes`, `quota_max_objects`), `compression_mode`,
-  `erasure_code_profile`, and a free-form `parameters` JSON map. Unique per
+  `erasure_code_profile`, exact `execution_node`, and a free-form `parameters`
+  JSON map. Unique per
   (`cluster`, `name`) via `netbox_ceph_pool_desired_identity`.
 - `CephFilesystemDesiredState` — desired CephFS config: `metadata_pool` (FK to a
   `CephPoolDesiredState`), `data_pools` (JSON list), `mds_placement`,
-  `standby_count`, `max_mds`, `quota_max_bytes`, and `parameters`. Unique per
+  `standby_count`, `max_mds`, `quota_max_bytes`, exact `execution_node`,
+  `pg_num`, `add_storage`, and `parameters`. Unique per
   (`cluster`, `name`) via `netbox_ceph_filesystem_desired_identity`.
 - `CephRBDImageDesiredState` — desired RBD image config: `pool_name`, `name`,
   `size_bytes`, `features`, layout (`object_size`, `stripe_unit`,
@@ -157,11 +160,18 @@ models are the NetBox-first, operator-editable source of intent:
   `parameters`. Unique per (`cluster`, `name`) via
   `netbox_ceph_rgw_bucket_desired_identity`.
 
-These models are writable NetBox objects (full CRUD UI + REST). An operator
-edits desired state, then a `CephOperation` references it to produce a
-`CephPlan` preview and, after validation, a `CephOperationRun` apply attempt
-through the orchestrator. Desired-state objects hold no secrets — provider
-credentials remain `credential_ref` pointers only. RGW/S3 users may store only
+These desired-state models are writable NetBox objects (full CRUD UI + REST),
+but writable intent is not the same as provider capability. Contract
+`proxbox-ceph-v2-2026-07` enables **Generate operation** only for pool and
+filesystem rows. Pool creation/update accepts only issue #258's typed fields;
+filesystem creation accepts only `pg_num` and `add_storage`. Quota,
+compression, pool topology/MDS placement, RBD, and RGW/S3 mutations fail closed
+until the Proxmox writer implements them. An operator edits supported desired
+state, then a `CephOperation` produces an append-only `CephPlan` preview. A
+distinct approver creates a token-free `CephOperationApproval` audit row and an
+immediate `CephOperationRun` through the orchestrator. Desired-state objects
+hold no secrets — provider credentials remain `credential_ref` pointers only.
+RGW/S3 users may store only
 the opaque `credential_ref`; do not add or expose access keys, secret keys,
 passwords, or tokens in NetBox.
 
@@ -196,25 +206,35 @@ status/path summary in job data, never raw proxbox-api response bodies.
 ## Orchestrator Feature Detection
 
 `netbox_ceph.services.orchestrator.CephOrchestratorClient` calls proxbox-api
-`/ceph/v2/*` routes using the existing `netbox_proxbox` FastAPI request
-context. HTTP 404/501 becomes `CephOrchestratorUnsupported`; connection errors
-become `CephOrchestratorUnavailable`.
+`/ceph/v2/*` routes only after proving exactly one enabled `FastAPIEndpoint`.
+It translates the operation's plugin `ProxmoxEndpoint` to the backend database
+ID through `netbox_proxbox.views.backend_sync.resolve_backend_endpoint_id`;
+plugin PKs are never placed on the wire as backend IDs. Generic 404/501 routes
+become `CephOrchestratorUnsupported`, timeouts remain distinct, and structured
+backend errors retain only a stable reason plus allowlisted recovery IDs.
+
+Successful bodies are returned intact to the service, while only redacted
+copies enter logs. This is required because the approval token is returned once
+and must survive long enough for the same-request apply. The service never
+stores, serializes, renders, or logs the raw token or token hash.
 
 Unsupported operations fail clearly. Do not add shell command fallbacks or local
 Ceph CLI execution paths.
 
 ## Orchestrator Response Mapping
 
-proxbox-api (#95) returns `PlanResponse`/`OperationRun` with `operations`,
+proxbox-api (#95, hardened by #258) returns `PlanResponse`/`OperationRun` with `operations`,
 `blocked_actions`, `warnings`, `live_state_summary`, `provider_task_refs` (a
 **list** of Proxmox UPIDs), and `status` in
-`completed`/`running`/`failed`/`blocked`/`cancelled`. These field names differ
+`pending`/`running`/`dispatching`/`completed`/`failed`/`blocked`/`cancelled`/
+`outcome_unknown`. These field names differ
 from the NetBox `CephPlan`/`CephOperationRun` models, so
 `netbox_ceph/services/ceph_v2_responses.py` (pure, Django-free, unit-tested in
 `tests/test_v2_response_mapping.py`) translates them:
 
 - `map_run_status()` — proxbox status → `CephOperationStatusChoices`
-  (`completed`→`succeeded`, `running`→`applying`, `blocked`→`failed`, …).
+  (`completed`→`succeeded`, `running`/`dispatching`→`applying`,
+  `blocked`→`failed`, …).
 - `provider_task_ref()` — joins `provider_task_refs` (list) into the singular
   `CephOperationRun.provider_task_ref`, with back-compat for singular keys.
 - `plan_fields_from_response()` — derives `intended_changes`/`expected_tasks`/
@@ -222,10 +242,18 @@ from the NetBox `CephPlan`/`CephOperationRun` models, so
   `blocked_actions`/`warnings`/`live_state_summary`, preferring explicit legacy
   fields when present.
 
-`netbox_ceph/api/views.py` wraps these with the `ChoiceSet` validation. The full
-backend response is always retained in `CephPlan.raw` / `CephOperationRun.result`.
+`netbox_ceph/api/views.py` wraps these with the `ChoiceSet` validation. The
+structurally complete but secret-redacted backend response is retained in
+`CephPlan.raw` / `CephOperationRun.result`.
 When proxbox-api response schemas change, update this mapper (and its tests), not
 the view handlers.
+
+The #258 write boundary is stricter than the general response mapper. Planning
+must return exactly one supported `ProviderOperation` whose `provider`, `kind`,
+`target_ref`, explicit top-level `node`, action, and `after_summary` match the
+local operation and typed writer field set. Unknown keys, a missing or
+different node, blockers, error validations, unsupported actions, or a changed
+endpoint/provider/configuration snapshot reject the plan before approval.
 
 ## Declarative → Imperative: Operation Actions And The Desired-State Bridge
 
@@ -235,9 +263,10 @@ service modules, both consumed by the REST API (`netbox_ceph/api/views.py`) and
 the NetBox web action views (`netbox_ceph/views.py`) so REST and UI share one
 implementation:
 
-- `netbox_ceph/services/operation_actions.py` — owns the orchestrator call plus
-  persistence/status transitions for `plan_operation()`, `apply_operation()`, and
-  provider `reconcile_provider()`. Failures raise a typed `OperationActionError`
+- `netbox_ceph/services/operation_actions.py` — owns exact endpoint resolution,
+  append-only `plan_operation()`, token-transient
+  `approve_and_apply_operation()`, ambiguity recovery, and read-only provider
+  `reconcile_provider()`. Failures raise a typed `OperationActionError`
   (`kind` in `invalid`/`unsupported`/`unavailable`/`backend`); the API maps
   `kind` → HTTP status (400/409/503/502), the UI maps it to a flash message. The
   shared response-mapping helpers (`operation_payload`, `refresh_plan`,
@@ -250,22 +279,63 @@ implementation:
   Generated operations use `operation_type=reconcile` and `is_destructive=False`:
   the proxbox-api Proxmox adapter `diff()` treats any non-delete action as
   "ensure" and resolves create/update/noop from live state, so a generated
-  reconcile is never destructive. Kind mapping: pool→`pool`,
-  filesystem→`filesystem`, rbd_image→`rbd_image` (`pool/name`),
-  rbd_snapshot→`rbd_snapshot` (`pool/image@snap`),
-  rgw_{realm,zone,user,bucket}→`rgw_*`. RGW users carry only the opaque
-  `credential_ref` — never access/secret keys.
+  reconcile is never destructive. The active kind mapping is only pool→`pool`
+  and filesystem→`filesystem`; each carries a required exact execution node.
+  RBD and RGW/S3 model names raise `DesiredStateContractError` and have no UI
+  generation route. The versioned fixture at
+  `tests/fixtures/ceph_v2_writer_contract.v1.json` pins field names and aliases
+  shared with proxbox-api #258.
+
+### Plan/approval invariants
+
+- A requester needs `request_cephoperation` and `apply_cephoperation`; a
+  different actor needs `approve_cephoperation`.
+- Direct and desired-state-generated operation requests enforce the same two
+  requester permissions and snapshot the authenticated username.
+- Every plan stores backend plan/digest/backend endpoint/configuration revision/
+  requester/expiry plus the plugin endpoint ID, provider ID and kind, exact
+  execution node, local configuration digest, and local request digest. The
+  local digest fingerprints endpoint routing and provider configuration without
+  persisting credentials. These snapshots are copied to approvals and runs and
+  must match before and after every authority reservation and every recovery
+  response. Refresh
+  appends a new plan and marks older unapplied authority
+  stale; validations are never deleted. A ten-minute nonce lease permits safe
+  planning crash recovery and rejects stale late responses.
+- Approval re-resolves all bindings and the request digest. A unique owner UUID
+  plus expiry leases approval issuance; only the lease owner may POST approval
+  or finalize its response, and an expired takeover invalidates a late owner.
+  The approval-to-run relation is one-to-one at the database layer. Legacy `confirmed`,
+  `confirmed_by`, and `confirmed_at` fields remain migration history only.
+- Multi-row operation/plan/approval/run transitions acquire a consistent
+  `select_for_update()` lock order and commit atomically. Named fault-injection
+  checkpoints prove partial status/audit writes roll back together. Routing
+  rows remain locked across the irreversible approval and apply POSTs; a
+  changed endpoint, provider, node, or local configuration fails closed.
+- Apply retries the same token at most once. `approval_replayed` recovers the
+  original backend run; unresolved transport ambiguity becomes
+  `outcome_unknown`, followed only by safe approval/run GETs.
+- `X-Proxbox-Actor` is a delegated assertion. Production writes stay blocked
+  until an authenticated gateway strips caller input and injects the verified
+  NetBox actor; migrations never enable endpoint writes.
+- Plans, validations, approvals, and runs are read-only API/UI audit surfaces.
+  Migration `0007` preserves legacy rows, stales old authority, and never
+  changes `allow_writes`. PostgreSQL-backed tests exercise the real NetBox
+  permission backend, row locks, concurrent reservation, lease takeover, and
+  protected audit chain; dependency-only pytest is not sufficient evidence for
+  these contracts.
 
 ### UI surface
 
 - **Operation detail** (`templates/netbox_ceph/cephoperation.html`): **Plan** and
-  **Apply** buttons. Apply shows only when the operation is `planned`; destructive
-  or confirmation-required operations route through a Bootstrap confirm modal that
-  posts `confirmed=true`.
+  **Approve & apply** buttons. The latter is available to an independent
+  approver after planning. A destructive warning modal is presentation only and
+  does not create authority.
 - **Provider detail** (`cephprovider.html`): **Reconcile** button → records a
   provider-scoped operation + run from `/ceph/v2/reconcile`.
-- **Desired-state detail** (all 8 models): **Generate operation** button →
-  `build_operation` → redirect to the new operation. The shared partial
+- **Supported desired-state detail** (pool and filesystem): **Generate
+  operation** button → `build_operation` → redirect to the new operation. RBD
+  and RGW/S3 rows remain CRUD-only until writer support exists. The shared partial
   `templates/netbox_ceph/inc/generate_operation_controls.html` resolves the URL
   generically via the `viewname` filter.
 

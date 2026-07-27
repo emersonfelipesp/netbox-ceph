@@ -203,6 +203,11 @@ _v2_items = (
         permissions=["netbox_ceph.view_cephplan"],
     ),
     PluginMenuItem(
+        link="plugins:netbox_ceph:cephoperationapproval_list",
+        link_text="Operation Approvals",
+        permissions=["netbox_ceph.view_cephoperationapproval"],
+    ),
+    PluginMenuItem(
         link="plugins:netbox_ceph:cephvalidationresult_list",
         link_text="Validation Results",
         permissions=["netbox_ceph.view_cephvalidationresult"],

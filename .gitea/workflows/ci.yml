@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: netbox-ceph-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Python 3.12 quality and package gate
+    runs-on: ci-untrusted-python312
+    timeout-minutes: 30
+    env:
+      HOME: ${{ github.workspace }}
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact netbox-proxbox authority contract
+        shell: bash
+        env:
+          NETBOX_PROXBOX_SHA: 82feea3b8ea875121dee7731c96be76fe2931611
+        run: |
+          set -eo pipefail
+          git clone --no-checkout https://git.nmulti.cloud/emersonfelipesp/netbox-proxbox.git netbox-proxbox
+          git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"
+          test "$(git -C netbox-proxbox rev-parse HEAD)" = "$NETBOX_PROXBOX_SHA"
+
+      - name: Create isolated environment
+        shell: bash
+        run: |
+          set -eo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          uv venv --python 3.12
+          uv pip install -e ./netbox-proxbox
+          uv pip install -e . --no-deps
+          uv pip install \
+            "requests==2.33.0" \
+            "pytest==9.0.3" \
+            "pytest-cov==7.1.0" \
+            "mkdocs==1.6.1" \
+            "mkdocs-material==9.7.6" \
+            "mkdocstrings[python]==1.0.3" \
+            "ghp-import==2.1.0" \
+            "ruff==0.15.8" \
+            "build==1.5.0" \
+            "twine==6.2.0"
+
+      - name: Static checks
+        shell: bash
+        run: |
+          set -eo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+          .venv/bin/python -m compileall netbox_ceph tests
+
+      - name: Tests and branch coverage
+        shell: bash
+        run: |
+          set -eo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          .venv/bin/pytest tests -v --tb=short \
+            --cov=netbox_ceph \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-fail-under=25
+
+      - name: Documentation and package
+        shell: bash
+        run: |
+          set -eo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          .venv/bin/mkdocs build --strict
+          .venv/bin/python -m build
+          .venv/bin/python -m twine check dist/*

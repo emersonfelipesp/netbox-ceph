@@ -29,6 +29,7 @@ from netbox_ceph.models import (  # noqa: E402
     CephFilesystemDesiredState,
     CephMetricSnapshot,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephPlan,
     CephPoolDesiredState,
@@ -85,6 +86,7 @@ def test_reflected_rgw_rbd_identity_constraints_are_named() -> None:
     [
         (CephProvider, "cephprovider"),
         (CephOperation, "cephoperation"),
+        (CephOperationApproval, "cephoperationapproval"),
         (CephPlan, "cephplan"),
         (CephValidationResult, "cephvalidationresult"),
         (CephOperationRun, "cephoperationrun"),
@@ -117,9 +119,35 @@ def test_v2_serializer_fields_are_present() -> None:
             "desired",
             "status",
         },
-        serializers.CephPlanSerializer: {"operation", "status", "intended_changes", "raw"},
+        serializers.CephPlanSerializer: {
+            "operation",
+            "status",
+            "intended_changes",
+            "raw",
+            "backend_plan_id",
+            "backend_plan_digest",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "request_digest",
+        },
+        serializers.CephOperationApprovalSerializer: {
+            "operation",
+            "plan",
+            "requester",
+            "approver",
+            "backend_approval_id",
+            "backend_run_id",
+            "backend_endpoint_config_revision",
+            "status",
+        },
         serializers.CephValidationResultSerializer: {"plan", "operation", "severity", "code"},
-        serializers.CephOperationRunSerializer: {"operation", "plan", "provider", "status"},
+        serializers.CephOperationRunSerializer: {
+            "operation",
+            "plan",
+            "provider",
+            "status",
+            "backend_endpoint_config_revision",
+        },
         serializers.CephDriftRecordSerializer: {
             "cluster",
             "object_kind",
@@ -133,15 +161,58 @@ def test_v2_serializer_fields_are_present() -> None:
         assert fields.issubset(set(serializer_cls.Meta.fields))
 
 
+def test_plan_approval_and_run_audit_surfaces_are_read_only() -> None:
+    for viewset_cls in (
+        views.CephPlanViewSet,
+        views.CephOperationApprovalViewSet,
+        views.CephValidationResultViewSet,
+        views.CephOperationRunViewSet,
+    ):
+        assert set(viewset_cls.http_method_names) == {"get", "head", "options"}
+
+
+def test_approval_audit_schema_cannot_serialize_a_raw_token() -> None:
+    fields = set(serializers.CephOperationApprovalSerializer.Meta.fields)
+    assert "token" not in fields
+    assert "approval_token" not in fields
+    assert "token_hash" not in fields
+
+
+def test_ceph_operation_declares_separate_request_apply_approve_permissions() -> None:
+    permissions = {codename for codename, _label in CephOperation._meta.permissions}
+    assert {
+        "request_cephoperation",
+        "apply_cephoperation",
+        "approve_cephoperation",
+    } <= permissions
+
+
 def test_apply_action_rejects_unplanned_operation_before_backend_call() -> None:
+    requester = SimpleNamespace(
+        pk=1,
+        username="requester",
+        is_authenticated=True,
+        has_perm=lambda permission, obj: True,
+        get_username=lambda: "requester",
+    )
+    approver = SimpleNamespace(
+        pk=2,
+        username="approver",
+        is_authenticated=True,
+        has_perm=lambda permission, obj: True,
+        get_username=lambda: "approver",
+    )
     viewset = views.CephOperationViewSet()
-    viewset.get_object = lambda: SimpleNamespace(status=CephOperationStatusChoices.STATUS_PENDING)
-    request = SimpleNamespace(data={})
+    viewset.get_object = lambda: SimpleNamespace(
+        status=CephOperationStatusChoices.STATUS_PENDING,
+        requested_by=requester,
+    )
+    request = SimpleNamespace(data={}, user=approver)
 
     response = viewset.apply(request)
 
     assert response.status_code == 400
-    assert "planned" in response.data["detail"]
+    assert "planned" in response.data["detail"]["detail"]
 
 
 def test_desired_state_identity_constraints_are_named() -> None:
@@ -352,7 +423,6 @@ def test_navigation_links_and_buttons_all_reverse() -> None:
 
 def test_reflected_inventory_viewsets_remain_read_only() -> None:
     reflected_viewsets = (
-        views.CephClusterViewSet,
         views.CephDaemonViewSet,
         views.CephOSDViewSet,
         views.CephPoolViewSet,
@@ -373,3 +443,12 @@ def test_reflected_inventory_viewsets_remain_read_only() -> None:
 
     for viewset_cls in reflected_viewsets:
         assert viewset_cls.http_method_names == ("get", "head", "options")
+
+    # Cluster POST exists only for the explicit read/reflection sync action;
+    # ordinary collection creation is rejected by the viewset.
+    assert views.CephClusterViewSet.http_method_names == (
+        "get",
+        "post",
+        "head",
+        "options",
+    )

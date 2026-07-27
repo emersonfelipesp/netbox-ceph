@@ -16,6 +16,7 @@ from netbox_ceph.models import (
     CephHealthCheck,
     CephMetricSnapshot,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephOSD,
     CephPlan,
@@ -40,6 +41,25 @@ from netbox_ceph.models import (
     CephRGWZoneGroup,
     CephValidationResult,
 )
+from netbox_ceph.services.redaction import (
+    SecretBearingIntentError,
+    validate_secret_free_intent,
+)
+
+
+class _SecretFreeIntentSerializerMixin:
+    """Reject credential-shaped data before DRF reaches model persistence."""
+
+    intent_fields: tuple[str, ...] = ()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        intent = {field: attrs[field] for field in self.intent_fields if field in attrs}
+        try:
+            validate_secret_free_intent(intent)
+        except SecretBearingIntentError as exc:
+            raise serializers.ValidationError({"intent": str(exc)}) from exc
+        return attrs
 
 
 class CephPluginSettingsSerializer(NetBoxModelSerializer):
@@ -592,7 +612,8 @@ class CephProviderSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "name", "kind", "status")
 
 
-class CephOperationSerializer(NetBoxModelSerializer):
+class CephOperationSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("desired",)
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephoperation-detail"
     )
@@ -608,6 +629,7 @@ class CephOperationSerializer(NetBoxModelSerializer):
             "operation_type",
             "target_kind",
             "target_ref",
+            "execution_node",
             "desired",
             "status",
             "is_destructive",
@@ -616,6 +638,7 @@ class CephOperationSerializer(NetBoxModelSerializer):
             "confirmed_by",
             "confirmed_at",
             "requested_by",
+            "requested_by_username",
             "source_branch_schema_id",
             "tags",
             "custom_fields",
@@ -623,6 +646,17 @@ class CephOperationSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "operation_type", "target_kind", "status")
+        read_only_fields = (
+            "status",
+            "confirmed",
+            "confirmed_by",
+            "confirmed_at",
+            "requested_by",
+            "requested_by_username",
+        )
+        extra_kwargs = {
+            "execution_node": {"required": True, "allow_blank": False},
+        }
 
 
 class CephPlanSerializer(NetBoxModelSerializer):
@@ -647,12 +681,67 @@ class CephPlanSerializer(NetBoxModelSerializer):
             "is_destructive",
             "generated_at",
             "raw",
+            "backend_plan_id",
+            "backend_plan_digest",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
+            "requester",
+            "requester_username",
+            "expires_at",
+            "request_digest",
             "tags",
             "custom_fields",
             "created",
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "operation", "status")
+
+
+class CephOperationApprovalSerializer(NetBoxModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ceph-api:cephoperationapproval-detail"
+    )
+
+    class Meta:
+        model = CephOperationApproval
+        fields = (
+            "id",
+            "url",
+            "display",
+            "operation",
+            "plan",
+            "backend_plan_id",
+            "backend_plan_digest",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
+            "requester",
+            "requester_username",
+            "approver",
+            "approver_username",
+            "backend_approval_id",
+            "issuance_reservation_id",
+            "issuance_reservation_expires_at",
+            "expires_at",
+            "status",
+            "backend_run_id",
+            "failure_code",
+            "failure_detail",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        )
+        brief_fields = ("id", "url", "display", "operation", "plan", "status")
 
 
 class CephValidationResultSerializer(NetBoxModelSerializer):
@@ -694,10 +783,20 @@ class CephOperationRunSerializer(NetBoxModelSerializer):
             "operation",
             "plan",
             "provider",
+            "approval",
             "status",
             "actor",
+            "actor_username",
             "source_branch_schema_id",
             "provider_task_ref",
+            "backend_run_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "local_config_digest",
+            "outcome_unknown",
             "started_at",
             "finished_at",
             "result",
@@ -764,7 +863,8 @@ class CephMetricSnapshotSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "scope", "object_ref", "captured_at")
 
 
-class CephPoolDesiredStateSerializer(NetBoxModelSerializer):
+class CephPoolDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("parameters",)
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephpooldesiredstate-detail"
     )
@@ -778,6 +878,7 @@ class CephPoolDesiredStateSerializer(NetBoxModelSerializer):
             "cluster",
             "provider",
             "name",
+            "execution_node",
             "enabled",
             "size",
             "min_size",
@@ -796,9 +897,13 @@ class CephPoolDesiredStateSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "name", "application", "enabled")
+        extra_kwargs = {
+            "execution_node": {"required": True, "allow_blank": False},
+        }
 
 
-class CephFilesystemDesiredStateSerializer(NetBoxModelSerializer):
+class CephFilesystemDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("data_pools", "parameters")
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephfilesystemdesiredstate-detail"
     )
@@ -812,12 +917,15 @@ class CephFilesystemDesiredStateSerializer(NetBoxModelSerializer):
             "cluster",
             "provider",
             "name",
+            "execution_node",
             "enabled",
             "metadata_pool",
             "data_pools",
             "mds_placement",
             "standby_count",
             "max_mds",
+            "pg_num",
+            "add_storage",
             "quota_max_bytes",
             "parameters",
             "tags",
@@ -826,9 +934,13 @@ class CephFilesystemDesiredStateSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "name", "enabled")
+        extra_kwargs = {
+            "execution_node": {"required": True, "allow_blank": False},
+        }
 
 
-class CephRBDImageDesiredStateSerializer(NetBoxModelSerializer):
+class CephRBDImageDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("features", "metadata", "parameters")
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrbdimagedesiredstate-detail"
     )
@@ -862,7 +974,10 @@ class CephRBDImageDesiredStateSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "name", "pool_name", "enabled")
 
 
-class CephRBDSnapshotDesiredStateSerializer(NetBoxModelSerializer):
+class CephRBDSnapshotDesiredStateSerializer(
+    _SecretFreeIntentSerializerMixin, NetBoxModelSerializer
+):
+    intent_fields = ("parameters",)
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrbdsnapshotdesiredstate-detail"
     )
@@ -888,7 +1003,8 @@ class CephRBDSnapshotDesiredStateSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "name", "image", "enabled")
 
 
-class CephRGWRealmDesiredStateSerializer(NetBoxModelSerializer):
+class CephRGWRealmDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("parameters",)
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrgwrealmdesiredstate-detail"
     )
@@ -913,7 +1029,8 @@ class CephRGWRealmDesiredStateSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "name", "enabled", "is_default")
 
 
-class CephRGWZoneDesiredStateSerializer(NetBoxModelSerializer):
+class CephRGWZoneDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("endpoints", "placement_targets", "parameters")
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrgwzonedesiredstate-detail"
     )
@@ -942,7 +1059,8 @@ class CephRGWZoneDesiredStateSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "name", "realm", "enabled")
 
 
-class CephRGWUserDesiredStateSerializer(NetBoxModelSerializer):
+class CephRGWUserDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("credential_ref", "parameters")
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrgwuserdesiredstate-detail"
     )
@@ -974,7 +1092,8 @@ class CephRGWUserDesiredStateSerializer(NetBoxModelSerializer):
         brief_fields = ("id", "url", "display", "uid", "enabled", "suspended")
 
 
-class CephRGWBucketDesiredStateSerializer(NetBoxModelSerializer):
+class CephRGWBucketDesiredStateSerializer(_SecretFreeIntentSerializerMixin, NetBoxModelSerializer):
+    intent_fields = ("lifecycle_policy", "parameters")
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephrgwbucketdesiredstate-detail"
     )

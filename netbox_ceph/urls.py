@@ -32,6 +32,7 @@ _MODEL_ROUTES = (
     ("cephprovider", "providers"),
     ("cephoperation", "operations"),
     ("cephplan", "plans"),
+    ("cephoperationapproval", "operation-approvals"),
     ("cephvalidationresult", "validation-results"),
     ("cephoperationrun", "operation-runs"),
     ("cephdriftrecord", "drift-records"),

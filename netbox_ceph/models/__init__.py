@@ -34,6 +34,7 @@ from netbox_ceph.models.metrics import CephMetricSnapshot
 from netbox_ceph.models.operations import (
     CephDriftRecord,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephPlan,
     CephValidationResult,
@@ -52,6 +53,7 @@ __all__ = [
     "CephMetricSnapshot",
     "CephOSD",
     "CephOperation",
+    "CephOperationApproval",
     "CephOperationRun",
     "CephPlan",
     "CephPluginSettings",

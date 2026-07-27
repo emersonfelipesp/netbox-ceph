@@ -9,13 +9,22 @@ mirrors the proxbox-api ``/ceph/v2`` contract verified in proxbox-api's
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 from netbox_ceph.services import desired_state_operations as dso
+from netbox_ceph.services.redaction import SecretBearingIntentError
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures/ceph_v2_writer_contract.v1.json"
 
 
-def test_supported_models_covers_eight_desired_state_kinds() -> None:
-    assert len(dso.supported_models()) == 8
-    assert "CephPoolDesiredState" in dso.supported_models()
-    assert "CephRGWBucketDesiredState" in dso.supported_models()
+def test_supported_models_match_implemented_proxmox_writer_kinds() -> None:
+    assert dso.supported_models() == (
+        "CephPoolDesiredState",
+        "CephFilesystemDesiredState",
+    )
 
 
 def test_clean_drops_empty_values_keeps_false_and_zero() -> None:
@@ -43,11 +52,22 @@ def test_clean_folds_parameters_without_overriding_explicit_keys() -> None:
     assert cleaned == {"name": "explicit", "extra": "kept"}
 
 
+def test_clean_rejects_nested_secret_parameters_before_folding() -> None:
+    with pytest.raises(SecretBearingIntentError):
+        dso._clean(
+            {
+                "name": "unsafe",
+                "parameters": {"nested": {"apiToken": "must-not-persist"}},
+            }
+        )
+
+
 def test_pool_request_shape() -> None:
     request = dso.build_request(
         "CephPoolDesiredState",
         {
             "name": "rbd",
+            "execution_node": "pve-a",
             "size": 3,
             "min_size": 2,
             "pg_autoscale_mode": "on",
@@ -58,8 +78,8 @@ def test_pool_request_shape() -> None:
     )
     assert request["target_kind"] == "pool"
     assert request["target_ref"] == "rbd"
+    assert request["execution_node"] == "pve-a"
     assert request["desired"] == {
-        "name": "rbd",
         "size": 3,
         "min_size": 2,
         "pg_autoscale_mode": "on",
@@ -73,91 +93,86 @@ def test_filesystem_request_shape() -> None:
         "CephFilesystemDesiredState",
         {
             "name": "cephfs",
-            "metadata_pool_name": "cephfs_meta",
-            "data_pools": ["cephfs_data"],
-            "max_mds": 2,
+            "execution_node": "pve-a",
+            "pg_num": 128,
+            "add_storage": True,
         },
     )
     assert request["target_kind"] == "filesystem"
     assert request["target_ref"] == "cephfs"
-    assert request["desired"]["metadata_pool"] == "cephfs_meta"
-    assert request["desired"]["data_pools"] == ["cephfs_data"]
-    assert request["desired"]["max_mds"] == 2
+    assert request["execution_node"] == "pve-a"
+    assert request["desired"] == {"pg_num": 128, "add_storage": True}
 
 
-def test_rbd_image_ref_uses_pool_and_name() -> None:
-    request = dso.build_request(
+@pytest.mark.parametrize(
+    "model_name",
+    (
         "CephRBDImageDesiredState",
-        {"pool_name": "rbd", "name": "disk0", "size_bytes": 10737418240},
-    )
-    assert request["target_kind"] == "rbd_image"
-    assert request["target_ref"] == "rbd/disk0"
-    assert request["desired"]["pool"] == "rbd"
-    assert request["desired"]["size_bytes"] == 10737418240
-
-
-def test_rbd_snapshot_ref_uses_pool_image_and_snapshot() -> None:
-    request = dso.build_request(
         "CephRBDSnapshotDesiredState",
-        {"pool_name": "rbd", "image_name": "disk0", "name": "snap1", "protected": True},
-    )
-    assert request["target_kind"] == "rbd_snapshot"
-    assert request["target_ref"] == "rbd/disk0@snap1"
-    assert request["desired"]["protected"] is True
-
-
-def test_rgw_realm_request_shape() -> None:
-    request = dso.build_request(
         "CephRGWRealmDesiredState",
-        {"name": "default-realm", "is_default": True},
-    )
-    assert request["target_kind"] == "rgw_realm"
-    assert request["target_ref"] == "default-realm"
-    assert request["desired"] == {"name": "default-realm", "is_default": True}
-
-
-def test_rgw_zone_request_shape() -> None:
-    request = dso.build_request(
         "CephRGWZoneDesiredState",
-        {
-            "name": "z1",
-            "realm_name": "r1",
-            "zonegroup_name": "zg1",
-            "is_master": True,
-            "endpoints": ["http://rgw:7480"],
-        },
-    )
-    assert request["target_kind"] == "rgw_zone"
-    assert request["target_ref"] == "z1"
-    assert request["desired"]["realm"] == "r1"
-    assert request["desired"]["zonegroup"] == "zg1"
-    assert request["desired"]["endpoints"] == ["http://rgw:7480"]
-
-
-def test_rgw_user_request_carries_only_credential_ref() -> None:
-    request = dso.build_request(
         "CephRGWUserDesiredState",
+        "CephRGWBucketDesiredState",
+    ),
+)
+def test_unsupported_desired_kinds_fail_before_backend_planning(model_name) -> None:
+    with pytest.raises(dso.DesiredStateContractError, match="not supported"):
+        dso.build_request(model_name, {"name": "blocked"})
+
+
+@pytest.mark.parametrize(
+    "values, field",
+    (
+        ({"name": "pool", "quota_max_bytes": 1}, "quota_max_bytes"),
+        ({"name": "pool", "compression_mode": "aggressive"}, "compression_mode"),
+        ({"name": "pool", "parameters": {"unknown": True}}, "unknown"),
+    ),
+)
+def test_pool_builder_rejects_fields_outside_strict_writer(values, field) -> None:
+    with pytest.raises(dso.DesiredStateContractError, match=field):
+        dso.build_request("CephPoolDesiredState", values)
+
+
+def test_pool_builder_uses_proxbox_erasure_coding_alias() -> None:
+    request = dso.build_request(
+        "CephPoolDesiredState",
         {
-            "uid": "alice",
-            "display_name": "Alice",
-            "credential_ref": "vault:rgw/alice",
-            "suspended": False,
+            "name": "ec",
+            "execution_node": "pve-a",
+            "erasure_code_profile": "ec-profile",
         },
     )
-    assert request["target_kind"] == "rgw_user"
-    assert request["target_ref"] == "alice"
-    assert request["desired"]["credential_ref"] == "vault:rgw/alice"
-    # No raw secret keys are ever emitted.
-    assert "secret_key" not in request["desired"]
-    assert "access_key" not in request["desired"]
+    assert request["desired"] == {"erasure_coding": "ec-profile"}
 
 
-def test_rgw_bucket_request_shape() -> None:
-    request = dso.build_request(
-        "CephRGWBucketDesiredState",
-        {"name": "backups", "owner_uid": "alice", "versioning_enabled": True},
-    )
-    assert request["target_kind"] == "rgw_bucket"
-    assert request["target_ref"] == "backups"
-    assert request["desired"]["owner"] == "alice"
-    assert request["desired"]["versioning_enabled"] is True
+def test_versioned_writer_fixture_matches_real_builders() -> None:
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    assert fixture["contract_version"] == dso.CEPH_WRITE_CONTRACT_VERSION
+    for case in fixture["cases"]:
+        request = dso.build_request(case["model"], case["values"])
+        assert request == case["request"]
+        assert case["plan_request"] == {
+            "provider": "proxmox",
+            "endpoint_id": 41,
+            "desired_state": {
+                "objects": [
+                    {
+                        "kind": request["target_kind"],
+                        "target_ref": request["target_ref"],
+                        "action": "reconcile",
+                        "provider": "proxmox",
+                        "node": request["execution_node"],
+                        "payload": request["desired"],
+                    }
+                ]
+            },
+        }
+        assert case["provider_operation"] == {
+            "provider": "proxmox",
+            "kind": request["target_kind"],
+            "target_ref": request["target_ref"],
+            "action": "create",
+            "node": request["execution_node"],
+            "supported": True,
+            "after_summary": request["desired"],
+        }

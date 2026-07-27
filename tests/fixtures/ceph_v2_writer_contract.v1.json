@@ -1,0 +1,131 @@
+{
+  "contract_version": "proxbox-ceph-v2-2026-07",
+  "source": "proxbox-api issue #258 strict Proxmox Ceph writer",
+  "cases": [
+    {
+      "model": "CephPoolDesiredState",
+      "values": {
+        "name": "rbd",
+        "execution_node": "pve-a",
+        "size": 3,
+        "min_size": 2,
+        "pg_autoscale_mode": "on",
+        "crush_rule_name": "replicated_rule",
+        "application": "rbd",
+        "target_size_ratio": 0.25,
+        "parameters": {
+          "pg_num": 128,
+          "pg_num_min": 32
+        }
+      },
+      "request": {
+        "target_kind": "pool",
+        "target_ref": "rbd",
+        "execution_node": "pve-a",
+        "desired": {
+          "size": 3,
+          "min_size": 2,
+          "pg_autoscale_mode": "on",
+          "crush_rule": "replicated_rule",
+          "application": "rbd",
+          "target_size_ratio": 0.25,
+          "pg_num": 128,
+          "pg_num_min": 32
+        }
+      },
+      "plan_request": {
+        "provider": "proxmox",
+        "endpoint_id": 41,
+        "desired_state": {
+          "objects": [
+            {
+              "kind": "pool",
+              "target_ref": "rbd",
+              "action": "reconcile",
+              "provider": "proxmox",
+              "node": "pve-a",
+              "payload": {
+                "size": 3,
+                "min_size": 2,
+                "pg_autoscale_mode": "on",
+                "crush_rule": "replicated_rule",
+                "application": "rbd",
+                "target_size_ratio": 0.25,
+                "pg_num": 128,
+                "pg_num_min": 32
+              }
+            }
+          ]
+        }
+      },
+      "provider_operation": {
+        "provider": "proxmox",
+        "kind": "pool",
+        "target_ref": "rbd",
+        "action": "create",
+        "node": "pve-a",
+        "supported": true,
+        "after_summary": {
+          "size": 3,
+          "min_size": 2,
+          "pg_autoscale_mode": "on",
+          "crush_rule": "replicated_rule",
+          "application": "rbd",
+          "target_size_ratio": 0.25,
+          "pg_num": 128,
+          "pg_num_min": 32
+        }
+      }
+    },
+    {
+      "model": "CephFilesystemDesiredState",
+      "values": {
+        "name": "cephfs",
+        "execution_node": "pve-b",
+        "pg_num": 64,
+        "add_storage": true,
+        "parameters": {}
+      },
+      "request": {
+        "target_kind": "filesystem",
+        "target_ref": "cephfs",
+        "execution_node": "pve-b",
+        "desired": {
+          "pg_num": 64,
+          "add_storage": true
+        }
+      },
+      "plan_request": {
+        "provider": "proxmox",
+        "endpoint_id": 41,
+        "desired_state": {
+          "objects": [
+            {
+              "kind": "filesystem",
+              "target_ref": "cephfs",
+              "action": "reconcile",
+              "provider": "proxmox",
+              "node": "pve-b",
+              "payload": {
+                "pg_num": 64,
+                "add_storage": true
+              }
+            }
+          ]
+        }
+      },
+      "provider_operation": {
+        "provider": "proxmox",
+        "kind": "filesystem",
+        "target_ref": "cephfs",
+        "action": "create",
+        "node": "pve-b",
+        "supported": true,
+        "after_summary": {
+          "pg_num": 64,
+          "add_storage": true
+        }
+      }
+    }
+  ]
+}

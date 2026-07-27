@@ -20,6 +20,7 @@ from netbox_ceph.models import (
     CephHealthCheck,
     CephMetricSnapshot,
     CephOperation,
+    CephOperationApproval,
     CephOperationRun,
     CephOSD,
     CephPlan,
@@ -274,6 +275,7 @@ class CephOperationFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
             "operation_type",
             "target_kind",
             "target_ref",
+            "execution_node",
             "status",
             "is_destructive",
             "confirmation_required",
@@ -287,13 +289,54 @@ class CephOperationFilterSet(_ClusterSearchMixin, NetBoxModelFilterSet):
 class CephPlanFilterSet(NetBoxModelFilterSet):
     class Meta:
         model = CephPlan
-        fields = ("id", "operation", "status", "provider_target", "is_destructive")
+        fields = (
+            "id",
+            "operation",
+            "status",
+            "provider_target",
+            "is_destructive",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+        )
+
+    def search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(Q(summary__icontains=value) | Q(provider_target__icontains=value))
+
+
+class CephOperationApprovalFilterSet(NetBoxModelFilterSet):
+    class Meta:
+        model = CephOperationApproval
+        fields = (
+            "id",
+            "operation",
+            "plan",
+            "backend_endpoint_id",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
+            "requester",
+            "approver",
+            "status",
+            "backend_approval_id",
+            "backend_run_id",
+        )
 
     def search(self, queryset, name, value):
         if not value:
             return queryset
         return queryset.filter(
-            Q(summary__icontains=value) | Q(provider_target__icontains=value)
+            Q(backend_plan_id__icontains=value)
+            | Q(backend_approval_id__icontains=value)
+            | Q(backend_run_id__icontains=value)
+            | Q(failure_code__icontains=value)
         )
 
 
@@ -322,6 +365,11 @@ class CephOperationRunFilterSet(NetBoxModelFilterSet):
             "actor",
             "source_branch_schema_id",
             "provider_task_ref",
+            "backend_endpoint_config_revision",
+            "plugin_endpoint_id",
+            "provider_id_snapshot",
+            "provider_kind_snapshot",
+            "execution_node",
         )
 
     def search(self, queryset, name, value):

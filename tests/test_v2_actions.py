@@ -26,7 +26,7 @@ try:
 except Exception as exc:  # noqa: BLE001
     pytest.skip(f"NetBox app registry is not available: {exc}", allow_module_level=True)
 
-from django.urls import reverse  # noqa: E402
+from django.urls import NoReverseMatch, reverse  # noqa: E402
 
 from netbox_ceph import views  # noqa: E402
 from netbox_ceph.choices import CephOperationStatusChoices, CephOperationTypeChoices  # noqa: E402
@@ -43,24 +43,43 @@ def test_operation_payload_shape() -> None:
         operation_type="reconcile",
         target_kind="pool",
         target_ref="rbd",
+        execution_node="pve-a",
         desired={"size": 3},
         is_destructive=False,
         confirmation_required=False,
         confirmed=False,
         source_branch_schema_id="branch-abc",
     )
-    payload = operation_actions.operation_payload(operation)
+    payload = operation_actions.operation_payload(operation, endpoint_id=41)
     assert payload["provider_kind"] == "proxmox"
     assert payload["target_kind"] == "pool"
     assert payload["target_ref"] == "rbd"
+    assert payload["execution_node"] == "pve-a"
+    assert payload["desired_state"]["objects"][0]["node"] == "pve-a"
     assert payload["desired"] == {"size": 3}
     assert payload["source_branch_schema_id"] == "branch-abc"
+    assert payload["endpoint_id"] == 41
 
 
 def test_apply_operation_rejects_unplanned() -> None:
-    operation = SimpleNamespace(status=CephOperationStatusChoices.STATUS_PENDING)
+    requester = SimpleNamespace(
+        pk=1,
+        is_authenticated=True,
+        get_username=lambda: "requester",
+        has_perm=lambda permission, obj: True,
+    )
+    approver = SimpleNamespace(
+        pk=2,
+        is_authenticated=True,
+        get_username=lambda: "approver",
+        has_perm=lambda permission, obj: True,
+    )
+    operation = SimpleNamespace(
+        status=CephOperationStatusChoices.STATUS_PENDING,
+        requested_by=requester,
+    )
     with pytest.raises(operation_actions.OperationActionError) as excinfo:
-        operation_actions.apply_operation(operation, actor=None, confirmed=False)
+        operation_actions.apply_operation(operation, actor=approver, confirmed=True)
     assert excinfo.value.kind == "invalid"
     assert "planned" in excinfo.value.message
 
@@ -72,6 +91,7 @@ def test_instance_values_for_pool_resolves_without_db() -> None:
         {},
     )()
     pool.name = "rbd"
+    pool.execution_node = "pve-a"
     pool.size = 3
     pool.min_size = 2
     pool.pg_autoscale_mode = "on"
@@ -110,8 +130,16 @@ def test_action_views_are_registered() -> None:
         "plugins:netbox_ceph:cephoperation_apply",
         "plugins:netbox_ceph:cephprovider_reconcile",
         "plugins:netbox_ceph:cephpooldesiredstate_generate_operation",
-        "plugins:netbox_ceph:cephrgwbucketdesiredstate_generate_operation",
+        "plugins:netbox_ceph:cephfilesystemdesiredstate_generate_operation",
     ],
 )
 def test_action_routes_reverse(route_name: str) -> None:
     assert reverse(route_name, kwargs={"pk": 1})
+
+
+def test_unsupported_desired_state_has_no_generate_route() -> None:
+    with pytest.raises(NoReverseMatch):
+        reverse(
+            "plugins:netbox_ceph:cephrgwbucketdesiredstate_generate_operation",
+            kwargs={"pk": 1},
+        )

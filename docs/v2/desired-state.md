@@ -24,7 +24,10 @@ desired-state are tracked in their own follow-up changes.
 
 Reflected models answer "what does the cluster currently report?". Desired-state
 models answer "what should the cluster look like?". The reconciliation between
-the two is driven by the existing operation engine.
+the two is driven by the existing operation engine only where the selected
+provider advertises a matching typed writer. The current
+`proxbox-ceph-v2-2026-07` contract supports pool and CephFS generation; RBD and
+RGW/S3 rows are intent/audit records only.
 
 ## CephPoolDesiredState
 
@@ -32,14 +35,19 @@ Captures the intended configuration of a Ceph pool:
 
 - Identity: `cluster` + unique `name` (`netbox_ceph_pool_desired_identity`).
 - Optional `provider` binding for the controller that should apply it.
+- Required `execution_node`, the exact Proxmox node persisted into the plan.
 - Replication: `size`, `min_size`.
 - Placement: `pg_autoscale_mode` (`on` / `warn` / `off`), `crush_rule_name`,
   optional `erasure_code_profile`.
 - Usage: `application` (`rbd` / `cephfs` / `rgw` / `other`), `target_size_ratio`,
   `quota_max_bytes`, `quota_max_objects`.
 - Data services: `compression_mode` (`none` / `passive` / `aggressive` / `force`).
-- `enabled` flag and a free-form `parameters` JSON object for provider-specific
-  extensions.
+- `enabled` flag and a `parameters` JSON object. Operation generation accepts
+  only #258 writer keys: `add_storages`, `application`, `crush_rule`,
+  `erasure_coding`, `min_size`, `pg_autoscale_mode`, `pg_num`, `pg_num_min`,
+  `size`, `target_size`, and `target_size_ratio`. Unknown keys fail closed.
+  Quotas and non-`none` compression remain storable but cannot generate a
+  Proxmox write yet.
 
 ## CephFilesystemDesiredState
 
@@ -47,10 +55,15 @@ Captures the intended configuration of a CephFS filesystem:
 
 - Identity: `cluster` + unique `name` (`netbox_ceph_filesystem_desired_identity`).
 - Optional `provider` binding.
+- Required `execution_node`, plus writer fields `pg_num` and `add_storage`.
 - `metadata_pool` references a `CephPoolDesiredState` row; `data_pools` is an
   ordered list of pool names.
 - MDS placement: `mds_placement`, `standby_count`, `max_mds`.
 - `quota_max_bytes`, `enabled`, and a free-form `parameters` JSON object.
+
+The current writer supports CephFS create/noop with only `pg_num` and
+`add_storage`. Metadata/data-pool mapping, MDS placement/count, quotas, and
+unknown parameters remain storable but block operation generation when set.
 
 ## CephRBDImageDesiredState
 
@@ -109,14 +122,14 @@ by proxbox-api or its secret store. Do not add `access_key`, `secret_key`,
 
 ## Reconciliation Path
 
-Desired-state objects feed the existing plan/apply engine. An operator (or
-automation) creates a `CephOperation` whose `target_kind` is `pool`, `cephfs`,
-`rbd_image`, `rbd_snapshot`, `rgw_realm`, `rgw_zone`, `rgw_user`, or
-`rgw_bucket` and whose `desired` payload carries the serialized desired-state. The
-orchestrator client posts that to proxbox-api `/ceph/v2/plan` and
-`/ceph/v2/apply`, producing `CephPlan`, `CephValidationResult`, and
-`CephOperationRun` records. No new backend contract is introduced here — only
-the NetBox-side ability to express desired state.
+Supported desired-state objects feed the plan/apply engine. An operator (or
+automation) creates a node-bound `CephOperation` whose `target_kind` is `pool`
+or `filesystem` and whose `desired` payload contains only the exact #258 writer
+fields. The orchestrator posts one canonical desired object to proxbox-api
+`/ceph/v2/plan` and `/ceph/v2/apply`, producing `CephPlan`,
+`CephValidationResult`, `CephOperationApproval`, and `CephOperationRun`
+records. RBD/RGW kinds and unsupported pool/CephFS fields are rejected before
+planning; there is no generic payload filtering or provider fallback.
 
 Secrets are never stored on desired-state objects. Provider credentials remain
 behind the provider's opaque `credential_ref`, and any payload crossing the
@@ -148,8 +161,9 @@ State** navigation group, with list, detail, add, edit, and delete views.
 
 ## Generate operation (declarative → imperative)
 
-Each desired-state detail page has a **Generate operation** button. It builds a
-`CephOperation` from the row and opens it, ready to [plan and apply](plan-apply.md).
+Each supported desired-state detail page has a **Generate operation** button. It
+builds a `CephOperation` from the row and opens it, ready to
+[plan and apply](plan-apply.md).
 No fields are duplicated by hand — the operation's `target_kind`, `target_ref`,
 and `desired` payload are derived from the desired-state row by
 `netbox_ceph.services.desired_state_operations`:
@@ -158,14 +172,10 @@ and `desired` payload are derived from the desired-state row by
 |---|---|---|
 | `CephPoolDesiredState` | `pool` | `name` |
 | `CephFilesystemDesiredState` | `filesystem` | `name` |
-| `CephRBDImageDesiredState` | `rbd_image` | `pool/name` |
-| `CephRBDSnapshotDesiredState` | `rbd_snapshot` | `pool/image@snap` |
-| `CephRGWRealmDesiredState` | `rgw_realm` | `name` |
-| `CephRGWZoneDesiredState` | `rgw_zone` | `name` |
-| `CephRGWUserDesiredState` | `rgw_user` | `uid` |
-| `CephRGWBucketDesiredState` | `rgw_bucket` | `name` |
 
 Generated operations use `operation_type=reconcile` and are non-destructive: the
 proxbox-api Proxmox adapter resolves create/update/noop from live state, never a
-delete. RGW user operations carry only the opaque `credential_ref`; access and
-secret keys are never emitted into NetBox.
+delete. The exact execution node and typed payload are copied into the operation
+and later into every authority record. RBD and RGW/S3 pages deliberately expose
+no generate route or button until corresponding writer support exists. Their
+opaque `credential_ref` values never cross the current mutation boundary.

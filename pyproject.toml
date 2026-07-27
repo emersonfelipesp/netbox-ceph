@@ -31,7 +31,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "netbox-proxbox>=0.0.18,<0.1.0",
+    "netbox-proxbox>=0.0.23.post2,<0.1.0",
     "requests>=2.33.0",
 ]
 

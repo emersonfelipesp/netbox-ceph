@@ -86,9 +86,7 @@ def _get_json(
         raise CephBackendError(f"Ceph backend request failed: {exc}") from exc
 
     if response.status_code >= 400:
-        raise CephBackendError(
-            f"Ceph backend returned HTTP {response.status_code} for {path}."
-        )
+        raise CephBackendError(f"Ceph backend returned HTTP {response.status_code} for {path}.")
 
     try:
         payload = response.json()
