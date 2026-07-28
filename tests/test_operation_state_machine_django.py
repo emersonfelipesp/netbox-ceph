@@ -20,7 +20,7 @@ import django  # noqa: E402
 django.setup()
 
 from django.contrib.contenttypes.models import ContentType  # noqa: E402
-from django.db import IntegrityError, close_old_connections, transaction  # noqa: E402
+from django.db import IntegrityError, close_old_connections, connection, transaction  # noqa: E402
 from django.db.models.deletion import ProtectedError  # noqa: E402
 from django.utils import timezone  # noqa: E402
 from netbox_proxbox.models import ProxmoxEndpoint  # noqa: E402
@@ -194,7 +194,7 @@ def test_concurrent_approval_reservation_creates_exactly_one_authority() -> None
             )
             return issuance_owner is not None
         finally:
-            close_old_connections()
+            connection.close()
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(lambda _: reserve(), range(2)))
@@ -354,7 +354,7 @@ def test_live_issuance_lease_allows_exactly_one_backend_approval_post(monkeypatc
                 approver=User.objects.get(pk=approver.pk),
             )
         finally:
-            close_old_connections()
+            connection.close()
 
     def apply_second():
         second_started.set()

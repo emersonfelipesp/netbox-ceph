@@ -13,6 +13,15 @@ def _workflow(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def test_agents_guide_exactly_mirrors_claude_source() -> None:
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    marker = "@CLAUDE.md\n\n---\n\n"
+
+    assert marker in agents
+    assert agents.split(marker, maxsplit=1)[1] == claude
+
+
 def test_both_ci_surfaces_use_the_reviewed_authority_contract() -> None:
     for path in (".github/workflows/ci.yml", ".gitea/workflows/ci.yml"):
         workflow = _workflow(path)

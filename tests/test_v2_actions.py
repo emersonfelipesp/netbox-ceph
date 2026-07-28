@@ -8,6 +8,7 @@ proxbox-api contract suite and the pure builder tests.
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -26,11 +27,40 @@ try:
 except Exception as exc:  # noqa: BLE001
     pytest.skip(f"NetBox app registry is not available: {exc}", allow_module_level=True)
 
-from django.urls import NoReverseMatch, reverse  # noqa: E402
+from django.core.exceptions import PermissionDenied  # noqa: E402
+from django.http import Http404, HttpResponse  # noqa: E402
+from django.middleware.csrf import CsrfViewMiddleware  # noqa: E402
+from django.test import RequestFactory, override_settings  # noqa: E402
+from django.urls import (  # noqa: E402
+    NoReverseMatch,
+    clear_url_caches,
+    include,
+    path,
+    resolve,
+    reverse,
+)
 
 from netbox_ceph import views  # noqa: E402
 from netbox_ceph.choices import CephOperationStatusChoices, CephOperationTypeChoices  # noqa: E402
 from netbox_ceph.services import desired_state_operations, operation_actions  # noqa: E402
+
+_POOL_GENERATE_ROUTE = "plugins:netbox_ceph:cephpooldesiredstate_generate_operation"
+urlpatterns = [path("", include("netbox_ceph.urls"))]
+
+
+def _reverse_plugin_route(route_name: str, *, pk: int = 1) -> str:
+    plugin_route_name = route_name.rsplit(":", maxsplit=1)[-1]
+    with override_settings(ROOT_URLCONF=__name__):
+        clear_url_caches()
+        return reverse(f"netbox_ceph:{plugin_route_name}", kwargs={"pk": pk})
+
+
+def _pool_generate_callback():
+    with override_settings(ROOT_URLCONF=__name__):
+        url = _reverse_plugin_route(_POOL_GENERATE_ROUTE)
+        callback = resolve(url).func
+    clear_url_caches()
+    return url, callback
 
 
 def test_operation_payload_shape() -> None:
@@ -123,6 +153,177 @@ def test_action_views_are_registered() -> None:
     assert hasattr(views, "CephProviderReconcileView")
 
 
+def test_generate_operation_contract_error_flashes_and_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    desired_state = SimpleNamespace(get_absolute_url=lambda: "/desired-state/1/")
+    model = SimpleNamespace(objects=SimpleNamespace(all=lambda: object()))
+    request = SimpleNamespace(
+        user=SimpleNamespace(
+            is_authenticated=True,
+            get_username=lambda: "requester",
+            has_perms=lambda _permissions: True,
+        )
+    )
+    errors: list[str] = []
+
+    monkeypatch.setattr(
+        views,
+        "get_object_or_404",
+        lambda _queryset, **_kwargs: desired_state,
+    )
+    monkeypatch.setattr(views.messages, "error", lambda _request, message: errors.append(message))
+    monkeypatch.setattr(
+        views,
+        "redirect",
+        lambda url: SimpleNamespace(status_code=302, url=url),
+    )
+
+    def reject_unsupported_fields(*_args, **_kwargs):
+        raise desired_state_operations.DesiredStateContractError(
+            "Unsupported pool write field(s): quota_max_bytes."
+        )
+
+    monkeypatch.setattr(views, "build_operation", reject_unsupported_fields)
+    view = views._GenerateOperationView()
+    view.model = model
+
+    response = view.post(request, pk=1)
+
+    assert response.status_code == 302
+    assert response.url == "/desired-state/1/"
+    assert errors == [
+        "Generate operation failed: Unsupported pool write field(s): quota_max_bytes."
+    ]
+
+
+def test_generate_operation_contract_error_preserves_typed_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    desired_state = SimpleNamespace()
+    request = SimpleNamespace(
+        user=SimpleNamespace(
+            is_authenticated=True,
+            get_username=lambda: "requester",
+            has_perms=lambda _permissions: True,
+        )
+    )
+
+    def reject_unsupported_fields(*_args, **_kwargs):
+        raise desired_state_operations.DesiredStateContractError(
+            "Unsupported pool write field(s): quota_max_bytes."
+        )
+
+    monkeypatch.setattr(views, "build_operation", reject_unsupported_fields)
+
+    with pytest.raises(operation_actions.OperationActionError) as excinfo:
+        views._GenerateOperationView().perform(request, desired_state)
+
+    assert excinfo.value.kind == "unsupported"
+    assert excinfo.value.reason == "desired_state_contract_unsupported"
+    assert excinfo.value.message == "Unsupported pool write field(s): quota_max_bytes."
+
+
+def test_generate_operation_route_requires_both_permissions_before_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url, callback = _pool_generate_callback()
+    checked_permissions: list[tuple[str, ...]] = []
+
+    def has_perms(permissions) -> bool:
+        checked_permissions.append(tuple(permissions))
+        return False
+
+    request = RequestFactory().post(url)
+    request.user = SimpleNamespace(is_authenticated=True, has_perms=has_perms)
+    monkeypatch.setattr(
+        views,
+        "get_object_or_404",
+        lambda *_args, **_kwargs: pytest.fail("source lookup occurred before authorization"),
+    )
+
+    with pytest.raises(PermissionDenied):
+        callback(request, pk=1)
+
+    assert checked_permissions == [
+        (
+            "netbox_ceph.request_cephoperation",
+            "netbox_ceph.apply_cephoperation",
+        )
+    ]
+
+
+def test_generate_operation_route_restricts_source_visibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url, callback = _pool_generate_callback()
+    restricted_actions: list[str] = []
+
+    class FakeQuerySet:
+        def restrict(self, _user, action):
+            restricted_actions.append(action)
+            return self
+
+    queryset = FakeQuerySet()
+    model = SimpleNamespace(objects=SimpleNamespace(all=lambda: queryset))
+    monkeypatch.setattr(callback.view_class, "model", model)
+
+    def hidden_source(candidate_queryset, **_kwargs):
+        assert candidate_queryset is queryset
+        raise Http404
+
+    monkeypatch.setattr(views, "get_object_or_404", hidden_source)
+    request = RequestFactory().post(url)
+    request.user = SimpleNamespace(
+        is_authenticated=True,
+        has_perms=lambda _permissions: True,
+    )
+
+    with pytest.raises(Http404):
+        callback(request, pk=1)
+
+    assert restricted_actions == ["view"]
+
+
+def test_generate_operation_route_is_post_only() -> None:
+    url, callback = _pool_generate_callback()
+    request = RequestFactory().get(url)
+    request.user = SimpleNamespace(
+        is_authenticated=True,
+        has_perms=lambda _permissions: True,
+    )
+
+    response = callback(request, pk=1)
+
+    assert response.status_code == 405
+
+
+def test_generate_operation_route_enforces_csrf() -> None:
+    url, callback = _pool_generate_callback()
+    request = RequestFactory().post(url)
+    middleware = CsrfViewMiddleware(lambda _request: HttpResponse())
+
+    response = middleware.process_view(request, callback, (), {"pk": 1})
+
+    assert response is not None
+    assert response.status_code == 403
+
+
+def test_generate_operation_control_matches_required_permissions() -> None:
+    template = (
+        Path(views.__file__).parent
+        / "templates"
+        / "netbox_ceph"
+        / "inc"
+        / "generate_operation_controls.html"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "perms.netbox_ceph.request_cephoperation and perms.netbox_ceph.apply_cephoperation"
+    ) in template
+    assert "perms.netbox_ceph.add_cephoperation" not in template
+
+
 @pytest.mark.parametrize(
     "route_name",
     [
@@ -134,12 +335,11 @@ def test_action_views_are_registered() -> None:
     ],
 )
 def test_action_routes_reverse(route_name: str) -> None:
-    assert reverse(route_name, kwargs={"pk": 1})
+    assert _reverse_plugin_route(route_name)
 
 
 def test_unsupported_desired_state_has_no_generate_route() -> None:
     with pytest.raises(NoReverseMatch):
-        reverse(
+        _reverse_plugin_route(
             "plugins:netbox_ceph:cephrgwbucketdesiredstate_generate_operation",
-            kwargs={"pk": 1},
         )

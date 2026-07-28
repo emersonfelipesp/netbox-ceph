@@ -291,7 +291,9 @@ implementation:
 - A requester needs `request_cephoperation` and `apply_cephoperation`; a
   different actor needs `approve_cephoperation`.
 - Direct and desired-state-generated operation requests enforce the same two
-  requester permissions and snapshot the authenticated username.
+  requester permissions and snapshot the authenticated username. Generation
+  additionally restricts the source desired-state queryset by its exact
+  object-aware `view_*` permission before lookup.
 - Every plan stores backend plan/digest/backend endpoint/configuration revision/
   requester/expiry plus the plugin endpoint ID, provider ID and kind, exact
   execution node, local configuration digest, and local request digest. The
@@ -312,6 +314,9 @@ implementation:
   checkpoints prove partial status/audit writes roll back together. Routing
   rows remain locked across the irreversible approval and apply POSTs; a
   changed endpoint, provider, node, or local configuration fails closed.
+- Real-PostgreSQL concurrency tests must explicitly close each worker thread's
+  Django connection before the transaction test teardown flushes shared tables;
+  `close_old_connections()` alone does not provide that isolation guarantee.
 - Apply retries the same token at most once. `approval_replayed` recovers the
   original backend run; unresolved transport ambiguity becomes
   `outcome_unknown`, followed only by safe approval/run GETs.
