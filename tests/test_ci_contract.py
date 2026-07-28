@@ -6,11 +6,20 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AUTHORITY_SHA = "82feea3b8ea875121dee7731c96be76fe2931611"
+AUTHORITY_SHA = "24dde6a9095a84efdaa0e07a60c9728c2372e235"
 
 
 def _workflow(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_agents_guide_exactly_mirrors_claude_source() -> None:
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    marker = "@CLAUDE.md\n\n---\n\n"
+
+    assert marker in agents
+    assert agents.split(marker, maxsplit=1)[1] == claude
 
 
 def test_both_ci_surfaces_use_the_reviewed_authority_contract() -> None:

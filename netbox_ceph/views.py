@@ -58,7 +58,10 @@ from netbox_ceph.models import (
     CephRGWZoneGroup,
     CephValidationResult,
 )
-from netbox_ceph.services.desired_state_operations import build_operation
+from netbox_ceph.services.desired_state_operations import (
+    DesiredStateContractError,
+    build_operation,
+)
 from netbox_ceph.services.operation_actions import (
     OperationActionError,
     approve_and_apply_operation,
@@ -617,6 +620,7 @@ class _GenerateOperationView(_PostActionView):
     """Generate a CephOperation from a desired-state row, then open it."""
 
     permission = "netbox_ceph.request_cephoperation"
+    additional_permissions = ("netbox_ceph.apply_cephoperation",)
     action_label = "Generate operation"
 
     def perform(self, request, obj) -> tuple[str, str]:
@@ -629,7 +633,14 @@ class _GenerateOperationView(_PostActionView):
             raise PermissionDenied(
                 "Generating a Ceph operation requires request and apply permissions."
             )
-        operation = build_operation(obj, requested_by=_action_user(request))
+        try:
+            operation = build_operation(obj, requested_by=_action_user(request))
+        except DesiredStateContractError as exc:
+            raise OperationActionError(
+                exc,
+                kind="unsupported",
+                reason="desired_state_contract_unsupported",
+            ) from exc
         return "Operation generated from desired state.", operation.get_absolute_url()
 
 
@@ -637,6 +648,9 @@ for _ds_model in _OPERATION_GENERATING_DESIRED_STATE_MODELS:
     _view_cls = type(
         f"{_ds_model.__name__}GenerateOperationView",
         (_GenerateOperationView,),
-        {"model": _ds_model},
+        {
+            "model": _ds_model,
+            "object_permissions": (f"netbox_ceph.view_{_ds_model._meta.model_name}",),
+        },
     )
     register_model_view(_ds_model, "generate_operation", path="generate-operation")(_view_cls)

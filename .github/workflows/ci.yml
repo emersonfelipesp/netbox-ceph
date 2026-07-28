@@ -32,7 +32,7 @@ jobs:
 
       - name: Check out the minimum compatible netbox-proxbox contract
         env:
-          NETBOX_PROXBOX_SHA: 82feea3b8ea875121dee7731c96be76fe2931611
+          NETBOX_PROXBOX_SHA: 24dde6a9095a84efdaa0e07a60c9728c2372e235 # v0.0.23.post2
         run: |
           git clone --no-checkout https://github.com/emersonfelipesp/netbox-proxbox.git netbox-proxbox
           git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"
@@ -118,7 +118,7 @@ jobs:
 
       - name: Check out the exact netbox-proxbox authority contract
         env:
-          NETBOX_PROXBOX_SHA: 82feea3b8ea875121dee7731c96be76fe2931611
+          NETBOX_PROXBOX_SHA: 24dde6a9095a84efdaa0e07a60c9728c2372e235 # v0.0.23.post2
         run: |
           git clone --no-checkout https://github.com/emersonfelipesp/netbox-proxbox.git netbox-proxbox
           git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"

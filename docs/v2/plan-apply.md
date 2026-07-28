@@ -101,10 +101,12 @@ installation or migration.
 Plans, validation results, approval records, and operation runs accept only
 GET/HEAD/OPTIONS through the plugin API and use read-only NetBox UI views.
 Operation creation, including **Generate operation** from desired state, requires
-both requester permissions and captures an immutable username snapshot. Once a
-plan or other audit evidence exists, the operation request cannot be edited or
-deleted through the API or UI; protected foreign keys preserve the evidence
-chain at the database layer.
+both requester permissions plus `view_*` access to the exact desired-state row,
+and captures an immutable username snapshot. The source lookup uses NetBox's
+object-aware restricted queryset, so hidden and missing rows have the same 404
+boundary. Once a plan or other audit evidence exists, the operation request
+cannot be edited or deleted through the API or UI; protected foreign keys
+preserve the evidence chain at the database layer.
 
 ## UI actions
 

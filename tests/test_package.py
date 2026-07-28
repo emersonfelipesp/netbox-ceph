@@ -51,6 +51,18 @@ def test_pyproject_certification_metadata() -> None:
     assert (ROOT / "LICENSE").is_file()
 
 
+def test_installation_docs_match_the_runtime_peer_floor() -> None:
+    installation = (ROOT / "docs" / "installation.md").read_text(encoding="utf-8")
+    index = (ROOT / "docs" / "index.md").read_text(encoding="utf-8")
+    certification = (ROOT / "CERTIFICATION.md").read_text(encoding="utf-8")
+
+    assert "netbox-proxbox) `>=0.0.23.post2,<0.1.0`" in installation
+    assert ">=0.0.23.post2,<0.1.0" in index
+    assert "netbox-proxbox>=0.0.23.post2,<0.1.0" in certification
+    assert ">=0.0.18,<0.1.0" not in index
+    assert "netbox-proxbox>=0.0.18,<0.1.0" not in certification
+
+
 def test_package_metadata_version() -> None:
     from importlib import metadata
 
