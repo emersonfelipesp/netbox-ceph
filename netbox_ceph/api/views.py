@@ -358,6 +358,31 @@ class CephOperationViewSet(NetBoxModelViewSet):
     filterset_class = filtersets.CephOperationFilterSet
     permission_classes = (CephOperationActionPermissions,)
 
+    def _handle_background_request(self, request, action, action_kwargs=None):
+        """Refuse NetBox 4.7 background bulk writes for Ceph operations.
+
+        NetBox 4.7 added `?background=true` on bulk (list) writes. Its
+        `AsyncAPIJob` invokes the action method **directly**, which bypasses
+        `dispatch()` and therefore bypasses `initial()` — and `initial()` is
+        where this viewset intersects the `request` and `apply` object
+        constraints onto the queryset. `perform_create()` re-checks the two
+        model-level permissions, but object-level constraints would be silently
+        dropped on the deferred path, so a requester holding a broad `add`
+        permission could have operations created outside the constraints their
+        `request`/`apply` grants define.
+
+        Returning `None` makes the caller fall through to the synchronous path,
+        which goes through `dispatch()` and therefore through `initial()`, so
+        the authority intersection always applies. The client gets a normal
+        `201` instead of a `202`; nothing is lost but the deferral.
+
+        This override is inert on NetBox <= 4.6, where the base class has no
+        such hook and never calls it. Do not remove it to "support background
+        writes" without first moving the constraint intersection into a
+        worker-safe hook — the whole approval chain rests on it.
+        """
+        return None
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         queryset = CephOperation.objects.select_related(

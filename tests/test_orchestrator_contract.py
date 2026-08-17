@@ -328,3 +328,69 @@ def test_invalid_backend_endpoint_mapping_fails_closed(
 
     with pytest.raises(orchestrator.CephOrchestratorUnavailable, match="invalid identifier"):
         orchestrator.CephOrchestratorClient().resolve_backend_endpoint_id(SimpleNamespace(pk=9))
+
+
+# ---------------------------------------------------------------------------
+# NetBox 4.7 background bulk writes must not bypass the authority intersection
+# ---------------------------------------------------------------------------
+
+
+def test_ceph_operation_viewset_refuses_background_bulk_writes() -> None:
+    """NetBox 4.7's AsyncAPIJob bypasses dispatch(), and so bypasses initial().
+
+    `initial()` is where this viewset intersects the `request` and `apply`
+    object constraints onto the queryset, so a deferred write would silently
+    drop them. The viewset therefore overrides `_handle_background_request` to
+    always return None, forcing the synchronous path through `dispatch()`.
+
+    Asserted on the source rather than by importing the module, because the
+    mocked suite has no real NetBox — but asserted on the *definition and its
+    body*, not on a bare mention, so a comment cannot satisfy it.
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    viewsets = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "CephOperationViewSet"
+    ]
+    assert len(viewsets) == 1, "CephOperationViewSet not found"
+
+    overrides = [
+        node
+        for node in viewsets[0].body
+        if isinstance(node, ast.FunctionDef) and node.name == "_handle_background_request"
+    ]
+    assert overrides, (
+        "CephOperationViewSet must override _handle_background_request; without it "
+        "NetBox 4.7 background bulk creates bypass initial() and its request/apply "
+        "constraint intersection"
+    )
+
+    # The body must unconditionally return None — a conditional opt-out would
+    # reintroduce exactly the bypass this exists to close.
+    returns = [n for n in ast.walk(overrides[0]) if isinstance(n, ast.Return)]
+    assert len(returns) == 1, "expected exactly one return statement"
+    assert isinstance(returns[0].value, ast.Constant) and returns[0].value.value is None, (
+        "the override must return None unconditionally"
+    )
+    assert not [n for n in ast.walk(overrides[0]) if isinstance(n, ast.If)], (
+        "the override must not branch — every path has to fall through to the "
+        "synchronous, dispatch()-mediated write"
+    )
+
+
+def test_initial_still_intersects_request_and_apply_constraints() -> None:
+    """Guard the thing the override exists to protect."""
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py"
+    ).read_text(encoding="utf-8")
+    assert 'restrict(user, "request").restrict(user, "apply")' in source

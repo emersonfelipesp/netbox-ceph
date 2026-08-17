@@ -139,11 +139,15 @@ jobs:
           NETBOX_TEST_DB_PORT: 5432
           NETBOX_TEST_REDIS_HOST: 127.0.0.1
           NETBOX_TEST_REDIS_PORT: 6379
+          # Makes a broken NetBox harness a hard failure instead of a silent
+          # skip, so the real-NetBox compatibility module genuinely gates merges.
+          NETBOX_CEPH_REQUIRE_DJANGO: "1"
           PYTHONPATH: ${{ github.workspace }}/netbox/netbox:${{ github.workspace }}/netbox-proxbox:${{ github.workspace }}
         run: |
           python netbox/netbox/manage.py check
           python netbox/netbox/manage.py makemigrations netbox_ceph --check --dry-run
           python -m pytest -q --reuse-db \
+            tests/test_netbox_compat_django.py \
             tests/test_operation_state_machine_django.py \
             tests/test_v2_actions.py \
             tests/test_v2_netbox_contract.py

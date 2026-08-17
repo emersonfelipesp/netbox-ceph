@@ -72,6 +72,19 @@ def test_github_ci_exercises_real_postgresql_authority_state_machine() -> None:
     assert "tests/test_v2_netbox_contract.py" in workflow
     assert "makemigrations netbox_ceph --check --dry-run" in workflow
 
+    # The real-NetBox compatibility module must run in this job and must be
+    # unable to skip. The mocked suite loads compat.py by file path, so it
+    # never touches CephConfig or Django's check registry; without this cell
+    # reverting max_version to the old ceiling would leave CI entirely green.
+    #
+    # Assert the *pytest continuation line*, not the bare filename: a mention
+    # anywhere in the file -- a comment, for instance -- would otherwise satisfy
+    # a substring check while the test was not being run at all.
+    assert (
+        "            tests/test_netbox_compat_django.py \\\n" in workflow
+    ), "the real-NetBox compatibility module is not in the pytest invocation"
+    assert 'NETBOX_CEPH_REQUIRE_DJANGO: "1"' in workflow
+
 
 def test_github_ci_database_images_are_digest_pinned() -> None:
     workflow = _workflow(".github/workflows/ci.yml")
