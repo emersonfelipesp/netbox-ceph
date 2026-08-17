@@ -4,6 +4,11 @@ from __future__ import annotations
 
 __version__ = "0.0.1.post1"
 
+from .compat import (
+    PLUGIN_MAX_VERSION,
+    PLUGIN_MIN_VERSION,
+    register_netbox_compatibility_check,
+)
 
 try:
     from netbox.plugins import PluginConfig
@@ -23,13 +28,18 @@ else:
         author = "Emerson Felipe"
         author_email = "emersonfelipe.2003@gmail.com"
         base_url = "ceph"
-        min_version = "4.5.8"
-        max_version = "4.6.99"
+        # Sourced from .compat so the stable/experimental bands are declared in
+        # one place across the Proxbox plugin stack. max_version is the
+        # *experimental* ceiling: NetBox 4.7 loads without an opt-in, and
+        # .compat's system check warns that the line is not yet certified.
+        min_version = PLUGIN_MIN_VERSION
+        max_version = PLUGIN_MAX_VERSION
         required_plugins = ["netbox_proxbox"]
         queues: list[str] = []
 
         def ready(self) -> None:
             super().ready()
+            register_netbox_compatibility_check(self)
             from . import jobs  # noqa: F401 — registers CephSyncJob via JobRunner metaclass
 
     config = CephConfig
