@@ -148,6 +148,7 @@ jobs:
           python netbox/netbox/manage.py makemigrations netbox_ceph --check --dry-run
           python -m pytest -q --reuse-db \
             tests/test_netbox_compat_django.py \
+            tests/test_list_view_render_django.py \
             tests/test_operation_state_machine_django.py \
             tests/test_v2_actions.py \
             tests/test_v2_netbox_contract.py
