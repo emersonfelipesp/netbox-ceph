@@ -33,7 +33,7 @@ def test_plugin_config_exposes_certification_metadata() -> None:
 
     assert config.version == "0.0.1.post1"
     assert config.min_version == "4.5.8"
-    assert config.max_version == "4.6.99"
+    assert config.max_version == "4.7.99"
     assert config.required_plugins == ["netbox_proxbox"]
     assert config.author_email == "emersonfelipe.2003@gmail.com"
 
@@ -96,3 +96,47 @@ def test_docs_name_supported_netbox_versions() -> None:
 
     for image in SUPPORTED_NETBOX_IMAGES:
         assert image.rsplit(":", 1)[1] in docs
+
+
+def test_plugin_config_bounds_come_from_the_shared_compat_module() -> None:
+    """The declared bounds must be sourced from compat.py, not re-typed literals.
+
+    Two copies of the supported range would drift silently. The stable ceiling
+    (4.6.99) and the declared ceiling (4.7.99) are deliberately different: 4.7 is
+    admitted on an experimental basis, so ``max_version`` is the experimental one.
+    """
+    pytest.importorskip("netbox")
+    from netbox_ceph import config
+    from netbox_ceph.compat import (
+        EXPERIMENTAL_MAX_NETBOX_VERSION,
+        PLUGIN_MAX_VERSION,
+        PLUGIN_MIN_VERSION,
+        STABLE_MAX_NETBOX_VERSION,
+        STABLE_MIN_NETBOX_VERSION,
+    )
+
+    assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
+    assert config.max_version == PLUGIN_MAX_VERSION == EXPERIMENTAL_MAX_NETBOX_VERSION
+    assert STABLE_MAX_NETBOX_VERSION == "4.6.99"
+    assert EXPERIMENTAL_MAX_NETBOX_VERSION == "4.7.99"
+
+
+def test_packaging_is_a_declared_dependency() -> None:
+    """`compat.py` imports packaging at module scope, so the metadata must say so.
+
+    Inside a NetBox install it happens to be present transitively — NetBox core
+    uses it on the very same `PluginConfig.validate` path — and pytest drags it
+    in during CI. Neither is a declaration. Without this the wheel's metadata
+    misstates what the package imports, and a consumer resolving it outside a
+    NetBox environment gets an ImportError at plugin import time.
+    """
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = data["project"]["dependencies"]
+
+    assert any(spec.split(">=")[0].strip() == "packaging" for spec in declared), (
+        f"packaging must be declared in [project.dependencies]; got {declared}"
+    )
