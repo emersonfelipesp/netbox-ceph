@@ -80,9 +80,9 @@ def test_github_ci_exercises_real_postgresql_authority_state_machine() -> None:
     # Assert the *pytest continuation line*, not the bare filename: a mention
     # anywhere in the file -- a comment, for instance -- would otherwise satisfy
     # a substring check while the test was not being run at all.
-    assert (
-        "            tests/test_netbox_compat_django.py \\\n" in workflow
-    ), "the real-NetBox compatibility module is not in the pytest invocation"
+    assert "            tests/test_netbox_compat_django.py \\\n" in workflow, (
+        "the real-NetBox compatibility module is not in the pytest invocation"
+    )
     assert 'NETBOX_CEPH_REQUIRE_DJANGO: "1"' in workflow
 
 

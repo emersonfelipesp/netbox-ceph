@@ -350,9 +350,9 @@ def test_ceph_operation_viewset_refuses_background_bulk_writes() -> None:
     import ast
     from pathlib import Path
 
-    source = (
-        Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py"
-    ).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py").read_text(
+        encoding="utf-8"
+    )
     tree = ast.parse(source)
 
     viewsets = [
@@ -390,7 +390,7 @@ def test_initial_still_intersects_request_and_apply_constraints() -> None:
     """Guard the thing the override exists to protect."""
     from pathlib import Path
 
-    source = (
-        Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py"
-    ).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "netbox_ceph" / "api" / "views.py").read_text(
+        encoding="utf-8"
+    )
     assert 'restrict(user, "request").restrict(user, "apply")' in source

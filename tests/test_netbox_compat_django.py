@@ -51,9 +51,7 @@ try:
 except Exception as exc:  # pragma: no cover - depends on external test services
     if _REQUIRE_DJANGO:
         raise
-    pytest.skip(
-        f"NetBox test environment is not available: {exc}", allow_module_level=True
-    )
+    pytest.skip(f"NetBox test environment is not available: {exc}", allow_module_level=True)
 
 from packaging.version import parse as parse_version  # noqa: E402
 
@@ -132,9 +130,7 @@ def test_system_check_matches_the_running_release_band() -> None:
         # A maturity notice must never block startup.
         assert messages[0].level < 40
     else:
-        assert messages == [], (
-            f"stable release must emit no compatibility notice: {messages}"
-        )
+        assert messages == [], f"stable release must emit no compatibility notice: {messages}"
 
 
 def test_ready_registered_the_check_by_injecting_a_4_7_release() -> None:
