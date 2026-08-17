@@ -179,7 +179,7 @@ class CephClusterListView(generic.ObjectListView):
     table = tables.CephClusterTable
     filterset = filtersets.CephClusterFilterSet
     filterset_form = forms.CephClusterFilterForm
-    actions = {}  # read-only list (no add/edit/delete buttons)
+    actions = ()  # read-only list (no add/edit/delete buttons)
 
 
 # Tabs on the cluster detail surface
@@ -190,7 +190,7 @@ class CephClusterDaemonsTabView(generic.ObjectChildrenView):
     table = tables.CephDaemonTable
     filterset = filtersets.CephDaemonFilterSet
     template_name = "generic/object_children.html"
-    actions = {}
+    actions = ()
     tab = ViewTab(label="Daemons", badge=lambda obj: obj.daemons.count())
 
     def get_children(self, request, parent):
@@ -204,7 +204,7 @@ class CephClusterOSDsTabView(generic.ObjectChildrenView):
     table = tables.CephOSDTable
     filterset = filtersets.CephOSDFilterSet
     template_name = "generic/object_children.html"
-    actions = {}
+    actions = ()
     tab = ViewTab(label="OSDs", badge=lambda obj: obj.osds.count())
 
     def get_children(self, request, parent):
@@ -218,7 +218,7 @@ class CephClusterPoolsTabView(generic.ObjectChildrenView):
     table = tables.CephPoolTable
     filterset = filtersets.CephPoolFilterSet
     template_name = "generic/object_children.html"
-    actions = {}
+    actions = ()
     tab = ViewTab(label="Pools", badge=lambda obj: obj.pools.count())
 
     def get_children(self, request, parent):
@@ -241,7 +241,7 @@ def _register_readonly(model, table_cls, fs_cls, form_cls):
         table = table_cls
         filterset = fs_cls
         filterset_form = form_cls
-        actions = {}
+        actions = ()
 
 
 def _register_writable(model, table_cls, fs_cls, filter_form_cls, model_form_cls):
