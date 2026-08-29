@@ -41,6 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -e ./netbox-proxbox
+          python -m pip install "PyYAML>=6.0"
           python -m pip install -e . --no-deps
           python -m pip install "pytest==9.0.3" "pytest-cov==7.1.0" "ruff==0.15.8"
 
@@ -71,8 +72,10 @@ jobs:
         include:
           - netbox-version: "v4.5.8"
             netbox-ref: 75e1b86613792458b4d4c8d0cbbfc94df16cfaaf
-          - netbox-version: "v4.6.4"
-            netbox-ref: 3d73b2a1669ad03c9f0ccb1332fe201d60cbce9e
+          - netbox-version: "v4.6.6"
+            netbox-ref: fb8c455ba61b57119a70670612dfdd05e8438b10
+          - netbox-version: "v4.7.0-beta2"
+            netbox-ref: aa1d49d0f5021a28e6efc2d0364b84c5bcec7137
     services:
       postgres:
         image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
@@ -128,6 +131,7 @@ jobs:
         run: |
           python -m pip install -r netbox/requirements.txt
           python -m pip install -e ./netbox-proxbox
+          python -m pip install "PyYAML>=6.0"
           python -m pip install -e . --no-deps
           python -m pip install "pytest==9.0.3" "pytest-django==4.12.0"
 

@@ -404,6 +404,33 @@ def test_branching_enabled_settings_reads_ceph_settings(branch_lifecycle_module)
     assert branch_lifecycle_module.branching_enabled_settings() is None
 
 
+def test_enabled_branching_fails_closed_when_runtime_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    branch_lifecycle_module,
+) -> None:
+    monkeypatch.setattr(branch_lifecycle_module, "is_branching_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="refusing to sync against the main schema"):
+        branch_lifecycle_module.branching_enabled_settings()
+
+
+def test_unreadable_branching_setting_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    branch_lifecycle_module,
+) -> None:
+    def fail_settings_read():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        branch_lifecycle_module.CephPluginSettings,
+        "get_solo",
+        fail_settings_read,
+    )
+
+    with pytest.raises(RuntimeError, match="Could not determine whether"):
+        branch_lifecycle_module.branching_enabled_settings()
+
+
 def test_branch_lifecycle_delegates_to_proxbox_helpers(branch_lifecycle_module) -> None:
     assert branch_lifecycle_module.is_branching_available() is True
     assert branch_lifecycle_module.get_active_branch_schema_id() == "active-schema"

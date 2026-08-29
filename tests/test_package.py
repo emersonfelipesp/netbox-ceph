@@ -17,6 +17,7 @@ SUPPORTED_NETBOX_IMAGES = (
     "netboxcommunity/netbox:v4.6.2",
     "netboxcommunity/netbox:v4.6.3",
     "netboxcommunity/netbox:v4.6.4",
+    "netboxcommunity/netbox:v4.6.6",
 )
 
 
@@ -33,7 +34,9 @@ def test_plugin_config_exposes_certification_metadata() -> None:
 
     assert config.version == "0.0.1.post1"
     assert config.min_version == "4.5.8"
-    assert config.max_version == "4.7.99"
+    assert config.max_version == "4.7.0"
+    assert config.approved_netbox_version == "4.7.0"
+    assert config.approved_netbox_designation == "beta2"
     assert config.required_plugins == ["netbox_proxbox"]
     assert config.author_email == "emersonfelipe.2003@gmail.com"
 
@@ -97,13 +100,16 @@ def test_docs_name_supported_netbox_versions() -> None:
     for image in SUPPORTED_NETBOX_IMAGES:
         assert image.rsplit(":", 1)[1] in docs
 
+    assert "v4.7.0-beta2" in docs
+    assert "aa1d49d0f5021a28e6efc2d0364b84c5bcec7137" in docs
+
 
 def test_plugin_config_bounds_come_from_the_shared_compat_module() -> None:
     """The declared bounds must be sourced from compat.py, not re-typed literals.
 
     Two copies of the supported range would drift silently. The stable ceiling
-    (4.6.99) and the declared ceiling (4.7.99) are deliberately different: 4.7 is
-    admitted on an experimental basis, so ``max_version`` is the experimental one.
+    (4.6.99) and held numeric ceiling (4.7.0) are deliberately different; the
+    release-identity guard narrows that bare 4.7.0 value to canonical beta2.
     """
     pytest.importorskip("netbox")
     from netbox_ceph import config
@@ -118,7 +124,7 @@ def test_plugin_config_bounds_come_from_the_shared_compat_module() -> None:
     assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
     assert config.max_version == PLUGIN_MAX_VERSION == EXPERIMENTAL_MAX_NETBOX_VERSION
     assert STABLE_MAX_NETBOX_VERSION == "4.6.99"
-    assert EXPERIMENTAL_MAX_NETBOX_VERSION == "4.7.99"
+    assert EXPERIMENTAL_MAX_NETBOX_VERSION == "4.7.0"
 
 
 def test_packaging_is_a_declared_dependency() -> None:

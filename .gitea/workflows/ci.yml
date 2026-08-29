@@ -43,6 +43,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv venv --python 3.12
           uv pip install -e ./netbox-proxbox
+          uv pip install "PyYAML>=6.0"
           uv pip install -e . --no-deps
           uv pip install \
             "requests==2.33.0" \

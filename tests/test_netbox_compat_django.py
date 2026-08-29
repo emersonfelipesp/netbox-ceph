@@ -155,11 +155,11 @@ def test_ready_registered_the_check_by_injecting_a_4_7_release() -> None:
     from django.core.checks import run_checks
 
     class _Release:
-        # Transcribed from netbox/release.yaml at tag v4.7.0-beta1; NetBox
+        # Transcribed from netbox/release.yaml at tag v4.7.0-beta2; NetBox
         # assembles full_version as version[-designation][-build].
         version = "4.7.0"
-        full_version = "4.7.0-beta1"
-        designation = "beta1"
+        full_version = "4.7.0-beta2"
+        designation = "beta2"
 
     with patch.object(settings, "RELEASE", _Release()):
         messages = [
@@ -170,9 +170,9 @@ def test_ready_registered_the_check_by_injecting_a_4_7_release() -> None:
 
     assert len(messages) == 1, (
         "CephConfig.ready() must register the compatibility check exactly once; "
-        f"got {messages} while pretending to run on NetBox 4.7.0-beta1"
+        f"got {messages} while pretending to run on NetBox 4.7.0-beta2"
     )
-    assert "4.7.0-beta1" in messages[0].msg
+    assert "4.7.0-beta2" in messages[0].msg
     assert "experimental" in messages[0].msg.lower()
     # The pre-release caveat must survive the real registration path too.
     assert "pre-release" in messages[0].msg.lower()
@@ -186,8 +186,8 @@ def test_injecting_a_stable_release_produces_no_notice() -> None:
     from django.core.checks import run_checks
 
     class _Release:
-        version = "4.6.4"
-        full_version = "4.6.4"
+        version = "4.6.6"
+        full_version = "4.6.6"
         designation = None
 
     with patch.object(settings, "RELEASE", _Release()):

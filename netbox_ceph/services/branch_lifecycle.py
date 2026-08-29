@@ -6,9 +6,10 @@ implementation of the in-process branching contract. Only the policy
 toggle (branching_enabled / prefix / on_conflict) is sourced locally from
 ``CephPluginSettings`` instead of ``ProxboxPluginSettings``.
 
-Branching is optional. When the netbox-branching plugin is not installed
-or branching is disabled in plugin settings, ``branching_enabled_settings``
-returns ``None`` and the caller stays on ``main``.
+Branching is optional. When it is disabled in plugin settings,
+``branching_enabled_settings`` returns ``None`` and the caller stays on
+``main``. When isolation is enabled but its runtime is unavailable, the helper
+raises rather than silently writing to the main schema.
 """
 
 from __future__ import annotations
@@ -101,16 +102,21 @@ def merge_branch(
 
 
 def branching_enabled_settings() -> dict[str, str] | None:
-    """Return Ceph branching config, or ``None`` when disabled/unavailable."""
-    if not is_branching_available():
-        return None
+    """Return enabled config, or fail closed when isolation is unavailable."""
     try:
         settings_obj = CephPluginSettings.get_solo()
-    except Exception:
-        logger.exception("Could not load CephPluginSettings")
-        return None
+    except Exception as error:
+        raise RuntimeError(
+            "Could not determine whether Ceph branch isolation is enabled; "
+            "refusing to sync against the main schema."
+        ) from error
     if not getattr(settings_obj, "branching_enabled", False):
         return None
+    if not is_branching_available():
+        raise RuntimeError(
+            "Ceph branch isolation is enabled, but netbox-branching is not "
+            "available; refusing to sync against the main schema."
+        )
     return {
         "prefix": getattr(settings_obj, "branch_name_prefix", "") or "ceph-sync",
         "on_conflict": getattr(settings_obj, "branch_on_conflict", "") or "fail",

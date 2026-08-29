@@ -65,7 +65,9 @@ When `CephPluginSettings.branching_enabled` is `True`, each sync job:
 
 Branching requires the
 [`netbox-branching`](https://github.com/netboxlabs/netbox-branching) plugin to
-be installed. Without it, `branching_enabled` has no effect.
+be installed and loaded. If `branching_enabled` is true while that runtime is
+unavailable, the sync fails closed before any write rather than falling back to
+the main schema.
 
 ## Dispatching a sync
 
