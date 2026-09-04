@@ -25,7 +25,7 @@ def test_agents_guide_exactly_mirrors_claude_source() -> None:
 def test_both_ci_surfaces_use_the_reviewed_authority_contract() -> None:
     expected_yaml_installs = {
         ".github/workflows/ci.yml": 2,
-        ".gitea/workflows/ci.yml": 1,
+        ".gitea/workflows/ci.yml": 2,
     }
     for path, install_count in expected_yaml_installs.items():
         workflow = _workflow(path)

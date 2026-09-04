@@ -108,7 +108,7 @@ alongside it as backward-compatibility evidence.
 
 | netbox-ceph | netbox-proxbox | NetBox | Python | requests |
 |---|---|---|---|---|
-| plan-bound approval contract (unreleased) | >=0.0.23.post2,<0.1.0 plus proxbox-api #258 (`proxbox-ceph-v2-2026-07`) | v4.5.8, v4.6.6, exact v4.7.0 SHA (matrix) | ≥3.12 | ≥2.33.0 |
+| v0.0.1.post2 | >=0.0.25.post1,<0.1.0 plus proxbox-api #258 (`proxbox-ceph-v2-2026-07`) | v4.5.8, v4.6.6, exact v4.7.0 SHA (matrix) | ≥3.12 | ≥2.33.0 |
 | v0.0.1.post1 | >=0.0.18,<0.1.0 | v4.5.8, v4.5.9, v4.6.0, v4.6.1, v4.6.2, v4.6.3, v4.6.4 | ≥3.12 | ≥2.33.0 |
 | v0.0.1 | >=0.0.16.post5 | ≥4.5.8 | ≥3.12 | ≥2.33.0 |
 

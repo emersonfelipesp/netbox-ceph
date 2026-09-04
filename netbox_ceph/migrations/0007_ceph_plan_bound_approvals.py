@@ -10,10 +10,21 @@ from django.db import migrations, models
 
 
 def retire_legacy_confirmation_authority(apps, schema_editor):
-    """Retire legacy authority without erasing its actor/time audit evidence."""
+    """Retire legacy authority while removing untrusted historical payloads."""
 
     CephOperation = apps.get_model("netbox_ceph", "CephOperation")
     CephPlan = apps.get_model("netbox_ceph", "CephPlan")
+    legacy_payload_marker = {
+        "redacted": True,
+        "reason": "Legacy payload was not proven secret-free during the authority migration.",
+    }
+
+    plans_with_payload = list(CephPlan.objects.all())
+    for plan in plans_with_payload:
+        if getattr(plan, "raw", None):
+            plan.raw = legacy_payload_marker.copy()
+    if any(getattr(plan, "raw", None) == legacy_payload_marker for plan in plans_with_payload):
+        CephPlan.objects.bulk_update(plans_with_payload, ("raw",))
 
     CephPlan.objects.exclude(status="applied").update(status="stale")
     CephOperation.objects.filter(
@@ -40,6 +51,12 @@ def retire_legacy_confirmation_authority(apps, schema_editor):
         CephPlan.objects.bulk_update(plans, ("requester", "requester_username"))
 
     CephOperationRun = apps.get_model("netbox_ceph", "CephOperationRun")
+    runs_with_payload = list(CephOperationRun.objects.all())
+    for run in runs_with_payload:
+        if getattr(run, "result", None):
+            run.result = legacy_payload_marker.copy()
+    if any(getattr(run, "result", None) == legacy_payload_marker for run in runs_with_payload):
+        CephOperationRun.objects.bulk_update(runs_with_payload, ("result",))
     runs = list(CephOperationRun.objects.exclude(actor=None).select_related("actor"))
     for run in runs:
         run.actor_username = str(run.actor.username)

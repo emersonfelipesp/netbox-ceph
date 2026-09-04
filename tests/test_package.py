@@ -33,7 +33,7 @@ def test_plugin_config_exposes_certification_metadata() -> None:
     pytest.importorskip("netbox")
     from netbox_ceph import config
 
-    assert config.version == "0.0.1.post1"
+    assert config.version == "0.0.1.post2"
     assert config.min_version == "4.5.8"
     assert config.max_version == "4.7.0"
     assert config.required_plugins == ["netbox_proxbox"]

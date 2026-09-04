@@ -20,7 +20,7 @@ This checklist tracks readiness for the NetBox Plugin Certification Program.
 - Documentation: <https://emersonfelipesp.github.io/netbox-ceph/>
 - PyPI: <https://pypi.org/project/netbox-ceph/>
 - Support: <https://github.com/emersonfelipesp/netbox-ceph/issues>
-- Certification target release: `0.0.1.post1`
+- Certification target release: `0.0.1.post2`
 - Verified targets: `v4.5.8`, `v4.5.9`, `v4.6.0`, `v4.6.1`, `v4.6.2`,
   `v4.6.3`, `v4.6.4`, `v4.6.6`, and exact `v4.7.0` source revision
   `5f06007e4c9bacc93ce17c1e645fc1143d60df3d`.

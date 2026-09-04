@@ -65,6 +65,7 @@ def test_plugin_is_actually_installed_and_loaded() -> None:
     """
     from django.apps import apps
 
+    assert apps.is_installed("netbox_proxbox")
     assert apps.is_installed("netbox_ceph")
 
 

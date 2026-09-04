@@ -101,6 +101,9 @@ class _Query:
     def select_related(self, *args):
         return self
 
+    def all(self):
+        return self
+
     def update(self, **values):
         for record in self.values:
             for field, value in values.items():
@@ -136,8 +139,13 @@ def test_authority_migration_preserves_legacy_actor_time_and_backfills_snapshots
         operation=operation,
         requester_id=None,
         requester_username="",
+        raw={"token": "legacy-secret"},
     )
-    run = SimpleNamespace(actor=user, actor_username="")
+    run = SimpleNamespace(
+        actor=user,
+        actor_username="",
+        result={"password": "legacy-secret"},
+    )
 
     models = {
         "CephOperation": SimpleNamespace(objects=_Manager([operation])),
@@ -156,4 +164,6 @@ def test_authority_migration_preserves_legacy_actor_time_and_backfills_snapshots
     assert plan.status == "stale"
     assert plan.requester_id == user.pk
     assert plan.requester_username == "legacy-operator"
+    assert plan.raw["redacted"] is True
+    assert run.result["redacted"] is True
     assert run.actor_username == "legacy-operator"

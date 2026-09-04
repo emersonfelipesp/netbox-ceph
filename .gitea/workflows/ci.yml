@@ -85,3 +85,90 @@ jobs:
           .venv/bin/mkdocs build --strict
           .venv/bin/python -m build
           .venv/bin/python -m twine check dist/*
+
+  netbox-ga-compatibility:
+    name: NetBox v4.7.0 exact-source compatibility
+    runs-on: ci-untrusted-python312
+    timeout-minutes: 45
+    env:
+      NETBOX_PROXBOX_SHA: 8b897739f436d03fb779e13f06eec34a9e03315d
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: netbox
+          POSTGRES_PASSWORD: netbox
+          POSTGRES_DB: netbox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netbox -d netbox"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout netbox-ceph
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact NetBox GA source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: netbox-community/netbox
+          ref: 5f06007e4c9bacc93ce17c1e645fc1143d60df3d
+          path: netbox
+          persist-credentials: false
+
+      - name: Checkout the exact netbox-proxbox authority contract
+        run: |
+          git clone --no-checkout https://git.nmulti.cloud/emersonfelipesp/netbox-proxbox.git netbox-proxbox
+          git -C netbox-proxbox checkout --detach "$NETBOX_PROXBOX_SHA"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the real NetBox test stack
+        run: |
+          python -m pip install -r netbox/requirements.txt
+          python -m pip install -e ./netbox-proxbox
+          python -m pip install "PyYAML>=6.0"
+          python -m pip install -e . --no-deps
+          python -m pip install "pytest==9.0.3" "pytest-django==4.12.0"
+
+      - name: Assert immutable NetBox and Proxbox checkouts
+        run: |
+          test "$(git -C netbox rev-parse HEAD)" = 5f06007e4c9bacc93ce17c1e645fc1143d60df3d
+          test "$(git -C netbox-proxbox rev-parse HEAD)" = "$NETBOX_PROXBOX_SHA"
+
+      - name: Check schema and run NetBox authority tests
+        env:
+          DJANGO_SETTINGS_MODULE: netbox.settings
+          NETBOX_CONFIGURATION: tests.netbox_test_configuration
+          NETBOX_TEST_DB_HOST: 127.0.0.1
+          NETBOX_TEST_DB_PORT: 5432
+          NETBOX_TEST_REDIS_HOST: 127.0.0.1
+          NETBOX_TEST_REDIS_PORT: 6379
+          NETBOX_CEPH_REQUIRE_DJANGO: "1"
+          PYTHONPATH: ${{ github.workspace }}/netbox/netbox:${{ github.workspace }}/netbox-proxbox:${{ github.workspace }}
+        run: |
+          python netbox/netbox/manage.py check
+          python netbox/netbox/manage.py migrate --no-input
+          python netbox/netbox/manage.py makemigrations netbox_ceph --check --dry-run
+          python -m pytest -q --reuse-db \
+            tests/test_netbox_compat_django.py \
+            tests/test_list_view_render_django.py \
+            tests/test_operation_state_machine_django.py \
+            tests/test_v2_actions.py \
+            tests/test_v2_netbox_contract.py
