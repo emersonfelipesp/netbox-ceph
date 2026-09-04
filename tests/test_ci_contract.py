@@ -70,8 +70,8 @@ def test_github_ci_exercises_real_postgresql_authority_state_machine() -> None:
     assert "netbox-ref: 75e1b86613792458b4d4c8d0cbbfc94df16cfaaf" in workflow
     assert 'netbox-version: "v4.6.6"' in workflow
     assert "netbox-ref: fb8c455ba61b57119a70670612dfdd05e8438b10" in workflow
-    assert 'netbox-version: "v4.7.0-beta2"' in workflow
-    assert "netbox-ref: aa1d49d0f5021a28e6efc2d0364b84c5bcec7137" in workflow
+    assert 'netbox-version: "v4.7.0"' in workflow
+    assert "netbox-ref: 5f06007e4c9bacc93ce17c1e645fc1143d60df3d" in workflow
     assert "ref: ${{ matrix.netbox-ref }}" in workflow
     assert "postgres-state-machine:" in workflow
     assert "tests/test_operation_state_machine_django.py" in workflow

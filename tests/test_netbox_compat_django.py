@@ -72,14 +72,13 @@ def test_plugin_config_sources_its_bounds_from_compat() -> None:
     """Catches the wiring being reverted while ``compat.py`` stays correct."""
     from netbox_ceph import config
     from netbox_ceph.compat import (
-        EXPERIMENTAL_MAX_NETBOX_VERSION,
         PLUGIN_MAX_VERSION,
         PLUGIN_MIN_VERSION,
         STABLE_MIN_NETBOX_VERSION,
     )
 
     assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
-    assert config.max_version == PLUGIN_MAX_VERSION == EXPERIMENTAL_MAX_NETBOX_VERSION
+    assert config.max_version == PLUGIN_MAX_VERSION == "4.7.99"
 
 
 def test_running_netbox_release_is_admitted_by_the_declared_range() -> None:
@@ -155,11 +154,11 @@ def test_ready_registered_the_check_by_injecting_a_4_7_release() -> None:
     from django.core.checks import run_checks
 
     class _Release:
-        # Transcribed from netbox/release.yaml at tag v4.7.0-beta2; NetBox
-        # assembles full_version as version[-designation][-build].
-        version = "4.7.0"
-        full_version = "4.7.0-beta2"
-        designation = "beta2"
+        # A pre-release designation is injected independently of the stable
+        # GA matrix so registration remains covered without supporting it.
+        version = "4.7.0a0"
+        full_version = "4.7.0a0"
+        designation = "a0"
 
     with patch.object(settings, "RELEASE", _Release()):
         messages = [
@@ -170,9 +169,9 @@ def test_ready_registered_the_check_by_injecting_a_4_7_release() -> None:
 
     assert len(messages) == 1, (
         "CephConfig.ready() must register the compatibility check exactly once; "
-        f"got {messages} while pretending to run on NetBox 4.7.0-beta2"
+        f"got {messages} while pretending to run on NetBox 4.7.0a0"
     )
-    assert "4.7.0-beta2" in messages[0].msg
+    assert "4.7.0a0" in messages[0].msg
     assert "experimental" in messages[0].msg.lower()
     # The pre-release caveat must survive the real registration path too.
     assert "pre-release" in messages[0].msg.lower()

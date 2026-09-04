@@ -32,6 +32,7 @@ jobs:
           - netboxcommunity/netbox:v4.6.3
           - netboxcommunity/netbox:v4.6.4
           - netboxcommunity/netbox:v4.6.6
+          - netboxcommunity/netbox:v4.7.0-5.1.0@sha256:73a54ff279461170032b59a57a1930929965e3ba15c195af59f4b5f6d39a84a9
     env:
       NETBOX_IMAGE: ${{ inputs.netbox_image || matrix.netbox_image }}
     steps:
