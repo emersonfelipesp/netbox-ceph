@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.1.post1"
+__version__ = "0.0.1.post2"
 
 from .compat import (
     PLUGIN_MAX_VERSION,

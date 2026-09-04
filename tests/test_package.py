@@ -26,7 +26,7 @@ def test_package_importable() -> None:
     pytest.importorskip("netbox")
     module = importlib.import_module("netbox_ceph")
     assert module is not None
-    assert module.__version__ == "0.0.1.post1"
+    assert module.__version__ == "0.0.1.post2"
 
 
 def test_plugin_config_exposes_certification_metadata() -> None:
@@ -35,7 +35,7 @@ def test_plugin_config_exposes_certification_metadata() -> None:
 
     assert config.version == "0.0.1.post1"
     assert config.min_version == "4.5.8"
-    assert config.max_version == "4.7.99"
+    assert config.max_version == "4.7.0"
     assert config.required_plugins == ["netbox_proxbox"]
     assert config.author_email == "emersonfelipe.2003@gmail.com"
 
@@ -44,11 +44,11 @@ def test_pyproject_certification_metadata() -> None:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = data["project"]
 
-    assert project["version"] == "0.0.1.post1"
+    assert project["version"] == "0.0.1.post2"
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert "License :: OSI Approved :: Apache Software License" not in project["classifiers"]
-    assert "netbox-proxbox>=0.0.23.post2,<0.1.0" in project["dependencies"]
+    assert "netbox-proxbox>=0.0.25.post1,<0.1.0" in project["dependencies"]
     assert project["urls"]["Documentation"] == "https://emersonfelipesp.github.io/netbox-ceph/"
     assert (ROOT / "LICENSE").is_file()
 
@@ -58,9 +58,9 @@ def test_installation_docs_match_the_runtime_peer_floor() -> None:
     index = (ROOT / "docs" / "index.md").read_text(encoding="utf-8")
     certification = (ROOT / "CERTIFICATION.md").read_text(encoding="utf-8")
 
-    assert "netbox-proxbox) `>=0.0.23.post2,<0.1.0`" in installation
-    assert ">=0.0.23.post2,<0.1.0" in index
-    assert "netbox-proxbox>=0.0.23.post2,<0.1.0" in certification
+    assert "netbox-proxbox) `>=0.0.25.post1,<0.1.0`" in installation
+    assert ">=0.0.25.post1,<0.1.0" in index
+    assert "netbox-proxbox>=0.0.25.post1,<0.1.0" in certification
     assert ">=0.0.18,<0.1.0" not in index
     assert "netbox-proxbox>=0.0.18,<0.1.0" not in certification
 
@@ -121,7 +121,7 @@ def test_plugin_config_bounds_come_from_the_shared_compat_module() -> None:
 
     assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
     assert config.max_version == PLUGIN_MAX_VERSION == STABLE_MAX_NETBOX_VERSION
-    assert STABLE_MAX_NETBOX_VERSION == "4.7.99"
+    assert STABLE_MAX_NETBOX_VERSION == "4.7.0"
 
 
 def test_packaging_is_a_declared_dependency() -> None:
