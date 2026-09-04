@@ -48,7 +48,7 @@ def test_pyproject_certification_metadata() -> None:
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert "License :: OSI Approved :: Apache Software License" not in project["classifiers"]
-    assert "netbox-proxbox>=0.0.25.post1,<0.1.0" in project["dependencies"]
+    assert "netbox-proxbox>=0.0.25.post2,<0.1.0" in project["dependencies"]
     assert project["urls"]["Documentation"] == "https://emersonfelipesp.github.io/netbox-ceph/"
     assert (ROOT / "LICENSE").is_file()
 
@@ -58,9 +58,9 @@ def test_installation_docs_match_the_runtime_peer_floor() -> None:
     index = (ROOT / "docs" / "index.md").read_text(encoding="utf-8")
     certification = (ROOT / "CERTIFICATION.md").read_text(encoding="utf-8")
 
-    assert "netbox-proxbox) `>=0.0.25.post1,<0.1.0`" in installation
-    assert ">=0.0.25.post1,<0.1.0" in index
-    assert "netbox-proxbox>=0.0.25.post1,<0.1.0" in certification
+    assert "netbox-proxbox) `>=0.0.25.post2,<0.1.0`" in installation
+    assert ">=0.0.25.post2,<0.1.0" in index
+    assert "netbox-proxbox>=0.0.25.post2,<0.1.0" in certification
     assert ">=0.0.18,<0.1.0" not in index
     assert "netbox-proxbox>=0.0.18,<0.1.0" not in certification
 

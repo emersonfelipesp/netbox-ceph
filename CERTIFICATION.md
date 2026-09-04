@@ -7,7 +7,7 @@ This checklist tracks readiness for the NetBox Plugin Certification Program.
 | Open source license | Apache-2.0 in `LICENSE` and `pyproject.toml` |
 | Package metadata | PyPI project `netbox-ceph`, project URLs, classifiers, Python `>=3.12` |
 | NetBox compatibility | Plugin config admits backward-compatible `4.5.8`–`4.7.0`, including official `v4.7.0` GA |
-| Dependency policy | Requires `netbox-proxbox>=0.0.25.post1,<0.1.0` and communicates with `proxbox-api` over HTTP |
+| Dependency policy | Requires `netbox-proxbox>=0.0.25.post2,<0.1.0` and communicates with `proxbox-api` over HTTP |
 | CI | GitHub Actions run lint, compile, pytest, docs, page coverage, screenshot capture, and release validation |
 | Documentation | README, MkDocs site, installation, models, sync, release notes, and support links |
 | Screenshots | `.github/workflows/docs-screenshots.yml` captures deterministic NetBox v4.6.4 UI screenshots into `docs/assets/screenshots` |

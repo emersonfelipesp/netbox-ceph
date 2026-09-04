@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AUTHORITY_SHA = "8b897739f436d03fb779e13f06eec34a9e03315d"
+AUTHORITY_SHA = "2ad98bd7f4f25b313ddaf57cc24c5669ed2f8ca4"
 
 
 def _workflow(path: str) -> str:
