@@ -1,0 +1,1318 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="NetBox plugin for read-only Proxmox Ceph inventory through netbox-proxbox / proxbox-api">
+      
+      
+      
+        <link rel="canonical" href="https://emersonfelipesp.github.io/netbox-ceph/v2/plan-apply/">
+      
+      
+        <link rel="prev" href="../desired-state/">
+      
+      
+        <link rel="next" href="../operations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Plan And Apply - netbox-ceph</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plan-independent-approval-apply-and-recovery" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="netbox-ceph" class="md-header__button md-logo" aria-label="netbox-ceph" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            netbox-ceph
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan And Apply
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="deep-orange"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/emersonfelipesp/netbox-ceph" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    emersonfelipesp/netbox-ceph
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="netbox-ceph" class="md-nav__button md-logo" aria-label="netbox-ceph" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    netbox-ceph
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/emersonfelipesp/netbox-ceph" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    emersonfelipesp/netbox-ceph
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Jobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ceph v2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Ceph v2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../desired-state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Desired State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan And Apply
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan And Apply
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#required-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeout-and-crash-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeout and crash recovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#permissions-and-audit-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permissions and audit surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-and-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade and rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nasa-npr-71502d-chapter-4-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NASA NPR 7150.2D Chapter 4 evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations And Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../certification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Certification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/ceph-v2-foundation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ceph v2 Foundation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/version-0.0.1.post1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Version 0.0.1.post1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#required-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeout-and-crash-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeout and crash recovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#permissions-and-audit-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permissions and audit surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-and-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade and rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nasa-npr-71502d-chapter-4-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NASA NPR 7150.2D Chapter 4 evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="plan-independent-approval-apply-and-recovery">Plan, Independent Approval, Apply, And Recovery<a class="headerlink" href="#plan-independent-approval-apply-and-recovery" title="Permanent link">&para;</a></h1>
+<p>Ceph v2 uses one fail-closed authority chain. A local boolean, a destructive
+confirmation modal, a plugin primary key, or a caller-provided inline plan can
+never authorize a Proxmox mutation.</p>
+<h2 id="required-flow">Required flow<a class="headerlink" href="#required-flow" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Create a <code>CephOperation</code> directly or from a supported desired-state row. The
+   server records the authenticated requester and requires an exact Proxmox
+   <code>execution_node</code>; callers cannot set status, requester, or legacy
+   confirmation fields. Desired-state generation currently supports only pool
+   and filesystem because proxbox-api #258 has no RBD/RGW writer.</li>
+<li>The requester needs both <code>netbox_ceph.request_cephoperation</code> and
+   <code>netbox_ceph.apply_cephoperation</code>, then invokes <strong>Plan</strong>. NetBox requires
+   exactly one enabled <code>FastAPIEndpoint</code>, translates the operation's
+   <code>ProxmoxEndpoint</code> through the canonical <code>netbox-proxbox</code> resolver, and sends
+   that backend database ID to <code>POST /ceph/v2/plans</code>.</li>
+<li>NetBox accepts exactly one supported provider operation whose provider,
+   target, action, explicit node, blockers, and typed payload match issue #258.
+   It appends the returned backend plan ID, digest, endpoint ID, opaque
+   server-keyed endpoint-configuration revision, requester, expiry, local
+   request digest, plugin endpoint ID, provider ID/kind, exact node, local
+   configuration digest, redacted response, and validation rows. It
+   marks an older unapplied plan stale but never overwrites or deletes its
+   evidence. Planning uses a ten-minute nonce lease: a crashed reservation may
+   be replaced after expiry, while its late response is rejected by the final
+   compare-and-swap check.</li>
+<li>A different authenticated actor with
+   <code>netbox_ceph.approve_cephoperation</code> invokes <strong>Approve &amp; apply</strong>. NetBox
+   re-resolves the backend endpoint, recomputes the local request digest, checks
+   requester permissions, valid/unblocked plan state, and plan expiry. It commits
+   a token-free <code>issuing</code> reservation with a unique owner UUID and ten-minute
+   expiry under database row locks before requesting one backend approval. A
+   contender cannot share that owner; expired takeover rotates the UUID and
+   makes every late response from the former owner non-authoritative.</li>
+<li>The raw approval token is held only in the current Python call. NetBox
+   re-locks and revalidates the endpoint/provider/node/configuration snapshots,
+   finalizes the token-free approval, creates its unique one-to-one run, then
+   immediately sends the original requester identity, canonical plan ID, exact
+   endpoint ID, endpoint revision, and token to
+   <code>POST /ceph/v2/plans/{id}/apply</code>.</li>
+</ol>
+<p>All multi-row status transitions use one atomic operation/plan/approval/run lock
+order. Routing rows remain locked across the irreversible approval and apply
+POSTs, and the snapshots are checked again after reservations. A changed local
+binding therefore rejects the attempt rather than dispatching with a freshly
+resolved target. Named fault-injection tests verify that an exception between
+row updates rolls the complete transition back.</p>
+<p>The REST endpoint is <code>POST
+/api/plugins/ceph/operations/{id}/approve-and-apply/</code>. The older <code>apply</code> action
+is a compatibility alias with the same two-person semantics; <code>confirmed=true</code>
+is ignored and has no authority.</p>
+<h2 id="timeout-and-crash-recovery">Timeout and crash recovery<a class="headerlink" href="#timeout-and-crash-recovery" title="Permanent link">&para;</a></h2>
+<p>An apply timeout, connection loss, HTTP 408/5xx response, or malformed success
+response is ambiguous, not a known failure. NetBox retries the exact same
+plan/token at most once. Because proxbox-api atomically consumes the token, the
+retry either performs the first dispatch or returns <code>approval_replayed</code> with
+the original operation run ID; it cannot authorize a second mutation.</p>
+<p>NetBox then reads <code>GET /ceph/v2/operations/{run_id}</code>. After two transport
+failures it records <code>outcome_unknown</code>, queries the safe
+<code>GET /ceph/v2/approvals/{approval_id}</code> recovery surface, and performs no third
+dispatch. If no linked run can be recovered, an operator must inspect/reconcile
+state and create a fresh plan. A consumed, expired, lost, or already-issued
+approval is never replaced on the same plan.</p>
+<p>Approval tokens and hashes do not appear in models, serializers, forms, tables,
+logs, exception messages, or recovery responses. Backend errors are reduced to
+stable reason codes and a small allowlist of recovery identifiers.</p>
+<p>The endpoint-configuration revision returned by proxbox-api is not a secret. It
+is an opaque HMAC evidence value and is copied across the local plan, approval,
+and run records. Every approval-status and run-recovery response must return the
+same canonical 64-hex revision; missing, malformed, changed, or legacy blank
+revisions fail closed and require a fresh plan.</p>
+<p>The local configuration digest is also non-secret evidence, not authority. It
+fingerprints the selected plugin endpoint and provider configuration (including
+opaque credential-reference changes) without persisting credentials. The plan,
+approval, and run copy the plugin endpoint ID, provider ID/kind, exact node, and
+digest so a post-plan routing change cannot be hidden by re-resolution.</p>
+<p><code>X-Proxbox-Actor</code> is a delegated identity assertion, not authentication by
+itself. Production write enablement remains blocked until the authenticated
+gateway strips any caller-supplied value and injects the NetBox-authenticated
+actor. Neither this plugin nor proxbox-api enables endpoint writes during
+installation or migration.</p>
+<h2 id="permissions-and-audit-surfaces">Permissions and audit surfaces<a class="headerlink" href="#permissions-and-audit-surfaces" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Required permission</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Requester</td>
+<td><code>request_cephoperation</code> and <code>apply_cephoperation</code></td>
+<td>Create/refresh the canonical plan and remain the backend apply actor</td>
+</tr>
+<tr>
+<td>Approver</td>
+<td><code>approve_cephoperation</code></td>
+<td>Issue the independent approval and trigger same-request apply; must differ from requester</td>
+</tr>
+<tr>
+<td>Auditor</td>
+<td>model <code>view_*</code> permissions</td>
+<td>Read plans, validations, approvals, and runs</td>
+</tr>
+</tbody>
+</table>
+<p>Plans, validation results, approval records, and operation runs accept only
+GET/HEAD/OPTIONS through the plugin API and use read-only NetBox UI views.
+Operation creation, including <strong>Generate operation</strong> from desired state, requires
+both requester permissions plus <code>view_*</code> access to the exact desired-state row,
+and captures an immutable username snapshot. The source lookup uses NetBox's
+object-aware restricted queryset, so hidden and missing rows have the same 404
+boundary. Once a plan or other audit evidence exists, the operation request
+cannot be edited or deleted through the API or UI; protected foreign keys
+preserve the evidence chain at the database layer.</p>
+<h2 id="ui-actions">UI actions<a class="headerlink" href="#ui-actions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Button</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Operation detail</td>
+<td><strong>Plan</strong></td>
+<td>Resolve exact endpoint and append a backend-bound plan</td>
+</tr>
+<tr>
+<td>Operation detail</td>
+<td><strong>Approve &amp; apply</strong></td>
+<td>Different actor approves and applies while the token remains memory-only</td>
+</tr>
+<tr>
+<td>Provider detail</td>
+<td><strong>Reconcile</strong></td>
+<td>Read provider state and record a provider-scoped run; no writer or approval is used</td>
+</tr>
+<tr>
+<td>Pool/CephFS desired-state detail</td>
+<td><strong>Generate operation</strong></td>
+<td>Build a pending, node-bound <code>CephOperation</code> from supported declarative intent</td>
+</tr>
+</tbody>
+</table>
+<p>RBD and RGW/S3 desired-state rows remain CRUD/audit surfaces and expose no
+generate action until a matching typed writer exists.</p>
+<h2 id="upgrade-and-rollback">Upgrade and rollback<a class="headerlink" href="#upgrade-and-rollback" title="Permanent link">&para;</a></h2>
+<p>Migration <code>0007_ceph_plan_bound_approvals</code> is additive. It preserves legacy
+plans/runs, marks non-applied legacy plans stale, and resets legacy <code>planning</code>,
+<code>planned</code>, <code>awaiting_confirmation</code>, and <code>applying</code> operations to <code>pending</code>.
+Nonterminal run rows still block new authority. The migration clears only the
+old confirmation boolean and preserves the historical confirming actor/time as
+non-authoritative audit evidence. It
+also snapshots requester/run usernames, adds endpoint/provider/node/local-config
+audit fields and approval issuance leases, and converts the approval/run link to
+a database-enforced one-to-one relation. Existing runs without approvals remain
+valid historical rows.
+Legacy blank revisions are non-authoritative and cannot be approved. The
+migration does not enable a Proxmox endpoint or dispatch a provider call.</p>
+<p>Roll out proxbox-api's canonical plan/approval contract before this consumer.
+Back up the NetBox database, apply the migration, grant the three custom
+permissions deliberately, and populate an exact <code>execution_node</code> on every
+legacy operation or supported pool/CephFS desired-state row before planning it.
+Keep <code>allow_writes=false</code>, and validate in an approved staging environment. The
+actor-header gateway control is also a hard production prerequisite. Rollback
+is application rollback plus the normal database restore procedure; do not
+reverse-delete audit rows after writes.</p>
+<h2 id="nasa-npr-71502d-chapter-4-evidence">NASA NPR 7150.2D Chapter 4 evidence<a class="headerlink" href="#nasa-npr-71502d-chapter-4-evidence" title="Permanent link">&para;</a></h2>
+<p>This table is scoped to the plan-bound approval feature and does not assert
+project-wide compliance.</p>
+<table>
+<thead>
+<tr>
+<th>Phase / requirement</th>
+<th>Status</th>
+<th>Evidence</th>
+<th>Remaining gap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Requirements — SWE-050, SWE-051, SWE-053, SWE-054, SWE-055, SWE-184</td>
+<td>Partial</td>
+<td>tracked inconsistencies plus exact endpoint/revision, two-person, replay, token, and ambiguity requirements in this guide</td>
+<td>stakeholder/consumer acceptance and release baseline pending</td>
+</tr>
+<tr>
+<td>Architecture — SWE-057, SWE-143</td>
+<td>Partial</td>
+<td>separate desired-state, canonical backend authority, node/config-bound token-free audit, expiring planning/issuance leases, and read-only recovery boundaries documented here</td>
+<td>project classification, production architecture approval, and cross-repository release baseline pending</td>
+</tr>
+<tr>
+<td>Design — SWE-058</td>
+<td>Partial</td>
+<td>append-only plan creation, unique pre-POST approval owner, fixed row-lock order, one approval/one run constraint, protected evidence chain, custom permissions, stable error/recovery types, and fault-injected state-machine tests</td>
+<td>independent adversarial review and approved baseline pending</td>
+</tr>
+<tr>
+<td>Implementation — SWE-060, SWE-061, SWE-062, SWE-063, SWE-135, SWE-136, SWE-186</td>
+<td>Partial</td>
+<td>issue worktree implementation, migration, Ruff/compile checks, agent docs</td>
+<td>remote CI, review closure, and merged baseline pending</td>
+</tr>
+<tr>
+<td>Testing — SWE-065, SWE-066, SWE-068, SWE-071, SWE-187, SWE-189, SWE-190, SWE-191, SWE-192, SWE-193, SWE-211</td>
+<td>Partial</td>
+<td>dependency-isolated contract/state-machine tests; the local NetBox 4.5.8/PostgreSQL feature suites cover object permissions, exact-one concurrent issuance, expired takeover/late-owner rejection, pending-run blocking, nested-secret rejection, stale binding rejection, transactional fault rollback, and approval/run uniqueness; a provider-owned test imports proxbox-api #258's real <code>PlanRequest</code> and <code>_build_and_persist</code> route guard; a GitHub migration-capable supported-version job is defined</td>
+<td>authoritative from-zero migration matrix, Gitea database-capable safe runner, staging, and green remote CI evidence pending</td>
+</tr>
+<tr>
+<td>Model/simulation qualification — SWE-070</td>
+<td>N/A</td>
+<td>no flight model or simulation is used</td>
+<td>not applicable</td>
+</tr>
+<tr>
+<td>Target validation — SWE-073</td>
+<td>Gap</td>
+<td>no live NetBox/Proxmox mutation was authorized</td>
+<td>approved staging validation remains required</td>
+</tr>
+<tr>
+<td>Operations — SWE-075, SWE-077, SWE-194, SWE-195, SWE-196</td>
+<td>Partial</td>
+<td>upgrade/rollback, permission, recovery, and compatibility guidance</td>
+<td>release notes, package publication, deploy, monitoring, and post-release evidence pending</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../desired-state/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Desired State">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Desired State
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../operations/" class="md-footer__link md-footer__link--next" aria-label="Next: Operations And Audit">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Operations And Audit
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
