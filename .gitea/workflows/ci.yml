@@ -29,7 +29,7 @@ jobs:
       - name: Check out the exact netbox-proxbox authority contract
         shell: bash
         env:
-          NETBOX_PROXBOX_SHA: 24dde6a9095a84efdaa0e07a60c9728c2372e235 # v0.0.23.post2
+          NETBOX_PROXBOX_SHA: 2ad98bd703f4ed06636b446ec7fc67749e4d69c9 # v0.0.25.post2
         run: |
           set -eo pipefail
           git clone --no-checkout https://git.nmulti.cloud/emersonfelipesp/netbox-proxbox.git netbox-proxbox

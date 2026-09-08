@@ -110,15 +110,16 @@ Use GitHub Issues for bugs and feature requests:
 Certification evidence is tracked in [CERTIFICATION.md](./CERTIFICATION.md).
 The repository includes Apache-2.0 licensing, PyPI metadata, compatibility
 metadata, GitHub Actions CI, release validation, docs publishing, screenshot
-capture, page-coverage workflows for NetBox v4.6.4, and Docker install smoke
-coverage through NetBox v4.6.6.
+capture and page-coverage workflows for NetBox v4.6.4. Digest-pinned Docker
+install smoke covers official NetBox v4.7.0 GA; exact-source integration tests
+cover the backward-compatible v4.5.8 through v4.6.6 range.
 
-Canonical NetBox `v4.7.0-beta2` metadata is additionally admitted on a
-**release-held** basis: the plugin warns once at startup, while final 4.7.0 and
-every other 4.7 identity fail closed. CI pins exact beta2 source revision
-`aa1d49d0f5021a28e6efc2d0364b84c5bcec7137`; the runtime guard verifies
-canonical release metadata. See [COMPATIBILITY.md](COMPATIBILITY.md) for the
-tier table, warning controls, and all-plugins-at-once upgrade requirement.
+Canonical NetBox `v4.7.0 GA` metadata is additionally admitted on a
+**GA** basis: the plugin admits GA without a compatibility warning, while 4.7.1 and
+later releases fail closed. CI pins exact GA source revision
+`5f06007e4c9bacc93ce17c1e645fc1143d60df3d`; the shared numeric compatibility
+bounds preserve the historical upgrade path. See [COMPATIBILITY.md](COMPATIBILITY.md)
+for the tier table and upgrade procedure.
 
 ## License
 

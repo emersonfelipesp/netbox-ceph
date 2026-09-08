@@ -348,48 +348,22 @@ Action URLs are registered with `register_model_view` on models already listed i
 `urls.py::_MODEL_ROUTES`, so `get_model_urls` auto-includes them — no `urls.py`
 change is needed when adding a new action to an already-routed model.
 
-## NetBox compatibility: two tiers, one shared module
+## NetBox compatibility: backward compatibility plus official GA
 
-`netbox_ceph/compat.py` is the single declaration of which NetBox releases this plugin
-supports, and `PluginConfig.min_version`/`max_version` are sourced from it rather
-than re-typed as literals:
+`netbox_ceph/compat.py` preserves the Emerson-owned NetBox `4.5.8` floor
+and admits official NetBox `4.7.0` GA as stable. The plugin declares
+`min_version = "4.5.8"` and `max_version = "4.7.0"`. NetBox 4.7
+prereleases remain experimental; 4.7.1 and later are outside this release's
+tested contract.
 
-- **stable** `4.5.8` – `4.6.99` — admitted silently; v4.5.8 and v4.6.6 are
-  exercised in the current real-NetBox matrix, and the rest of the band is
-  admitted on their strength;
-- **held beta** canonical `4.7.0-beta2` metadata only — the numeric ceiling is
-  `4.7.0`, and a fail-closed release guard rejects GA and every other 4.7
-  identity. The admitted beta emits system check `netbox_ceph.W001` (a
-  **Warning**, never an Error) plus one `ready()` log line. A version that
-  cannot be classified reports `netbox_ceph.W002` rather than passing silently.
-  Operators silence the notice with the
-  `silence_netbox_compatibility_warning` key in this plugin's
-  `PLUGINS_CONFIG` entry. NetBox does **not** read
-  `SILENCED_SYSTEM_CHECKS` from `configuration.py`, so that route does
-  nothing.
+The compatibility module is vendored byte-identically across
+`netbox-proxbox`, `netbox-ceph`, `netbox-pbs`, and `netbox-pdm`.
+Contract version is `netbox-compat-v5`. The legacy release-identity hook is
+retained as a no-op for downstream callers; runtime support uses the shared
+numeric bounds and does not hold on beta metadata.
 
-**`compat.py` is vendored byte-identically across `netbox-proxbox`,
-`netbox-ceph`, `netbox-packer`, `netbox-pbs`, and `netbox-pdm`.** Change it in
-one repo and you must change it in all five, bumping `CONTRACT_VERSION` when the
-contract itself moves. Verify with
-`sha256sum */compat.py` across the five checkouts — the
-`proxbox-stack-code-review` skill runs that drift check.
-
-Two hard rules:
-
-1. **No Django import at module scope in `compat.py`.** NetBox imports it while
-   `netbox/settings.py` is still executing, so every Django touch lives inside a
-   function.
-2. **Upgrading to NetBox 4.7 means upgrading the whole plugin family.**
-   `settings.py` *catches* `IncompatiblePluginError`, warns, and **skips** the
-   offending plugin — NetBox still starts. The failure is therefore silent: the
-   plugin's views, API routes and jobs are simply absent, and a health probe
-   against NetBox still passes. Verify registration with `apps.is_installed()`
-   after any upgrade rather than trusting that NetBox came up.
-
-NetBox passes the bare `RELEASE.version` (`"4.7.0"`) to the plugin gate for
-beta2, GA, and other 4.7.0 prereleases. Compatibility contract v3 therefore
-reads canonical `release.yaml` and requires designation `beta2`; local metadata
-may add only a build label. CI certification pins exact beta2 source revision
-`aa1d49d0f5021a28e6efc2d0364b84c5bcec7137`, while the runtime guard attests
-canonical release metadata rather than Git history.
+CI retains the legacy 4.5/4.6 cells and adds exact official NetBox 4.7.0 GA
+source revision
+`5f06007e4c9bacc93ce17c1e645fc1143d60df3d`. Existing installations retain
+the historical floor and can upgrade without a database reset or configuration
+rewrite.

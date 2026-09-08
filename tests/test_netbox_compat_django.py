@@ -4,7 +4,7 @@ The mocked suite (``tests/test_netbox_compat.py``) proves the classification log
 versions. This module proves the parts only a real NetBox can: that
 ``CephConfig`` actually sources its bounds from ``netbox_ceph.compat``, that the plugin is
 genuinely registered, that the NetBox release under test is admitted by those
-bounds, and that Django's real check registry surfaces the maturity notice as a
+bounds, and that Django's real check registry surfaces the pre-release maturity notice as a
 warning rather than an error.
 
 Without this, reverting ``max_version`` to the old ceiling — or deleting the
@@ -72,14 +72,14 @@ def test_plugin_config_sources_its_bounds_from_compat() -> None:
     """Catches the wiring being reverted while ``compat.py`` stays correct."""
     from netbox_ceph import config
     from netbox_ceph.compat import (
-        EXPERIMENTAL_MAX_NETBOX_VERSION,
         PLUGIN_MAX_VERSION,
         PLUGIN_MIN_VERSION,
+        STABLE_MAX_NETBOX_VERSION,
         STABLE_MIN_NETBOX_VERSION,
     )
 
     assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
-    assert config.max_version == PLUGIN_MAX_VERSION == EXPERIMENTAL_MAX_NETBOX_VERSION
+    assert config.max_version == PLUGIN_MAX_VERSION == STABLE_MAX_NETBOX_VERSION
 
 
 def test_running_netbox_release_is_admitted_by_the_declared_range() -> None:

@@ -2,9 +2,9 @@
 
 ## Requirements
 
-- NetBox 4.5.8, 4.5.9, and 4.6.0 through 4.6.4
+- NetBox 4.5.8 through 4.6.6, plus official NetBox 4.7.0 GA
 - Python 3.12+
-- [`netbox-proxbox`](https://github.com/emersonfelipesp/netbox-proxbox) `>=0.0.23.post2,<0.1.0`
+- [`netbox-proxbox`](https://github.com/emersonfelipesp/netbox-proxbox) `>=0.0.25.post2,<0.1.0`
 - A reachable [`proxbox-api`](https://github.com/emersonfelipesp/proxbox-api)
   instance exposing Ceph-aware endpoints
 
