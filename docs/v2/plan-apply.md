@@ -37,9 +37,11 @@ never authorize a Proxmox mutation.
 5. The raw approval token is held only in the current Python call. NetBox
    re-locks and revalidates the endpoint/provider/node/configuration snapshots,
    finalizes the token-free approval, creates its unique one-to-one run, then
-   immediately sends the original requester identity, canonical plan ID, exact
-   endpoint ID, endpoint revision, and token to
-   `POST /ceph/v2/plans/{id}/apply`.
+   immediately sends the original requester identity (`X-Proxbox-Actor`),
+   canonical plan ID, exact backend endpoint ID, and token to
+   `POST /ceph/v2/plans/{id}/apply`. The endpoint configuration revision is not
+   sent on apply; the backend re-derives it from the persisted plan and the
+   plugin compares the returned `endpoint_config_revision` to its own snapshot.
 
 All multi-row status transitions use one atomic operation/plan/approval/run lock
 order. Routing rows remain locked across the irreversible approval and apply
@@ -159,3 +161,17 @@ project-wide compliance.
 | Model/simulation qualification — SWE-070 | N/A | no flight model or simulation is used | not applicable |
 | Target validation — SWE-073 | Gap | no live NetBox/Proxmox mutation was authorized | approved staging validation remains required |
 | Operations — SWE-075, SWE-077, SWE-194, SWE-195, SWE-196 | Partial | upgrade/rollback, permission, recovery, and compatibility guidance | release notes, package publication, deploy, monitoring, and post-release evidence pending |
+
+## Wire contract pin
+
+The exact request/response shapes this flow relies on are recorded once, as
+data, in `tests/fixtures/proxbox_api_ceph_v2_contract.v1.json`. The fixture is
+derived from the proxbox-api Pydantic models (`proxbox_api/ceph/v2_schemas.py`)
+at the backend commit named in its `backend` block and lists, per route, the
+keys the plugin sends, the keys the backend requires, and the response keys the
+plugin reads or binds on. `netbox_ceph.services.orchestrator` pins the fixture's
+SHA-256 (`PROXBOX_API_V2_CONTRACT_SHA256`), and
+`tests/test_proxbox_api_v2_contract.py` walks every `CephOrchestratorClient`
+method against it. Regenerating the fixture for a newer backend is therefore a
+reviewed change on both sides: update the fixture, the pinned digest, and the
+minimum proxbox-api version in `COMPATIBILITY.md` together.

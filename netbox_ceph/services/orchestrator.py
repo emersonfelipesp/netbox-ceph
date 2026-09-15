@@ -20,6 +20,13 @@ from netbox_ceph.services.redaction import redact_secrets
 logger = logging.getLogger("netbox_ceph.orchestrator")
 
 _CEPH_V2_HTTP_TIMEOUT: tuple[float, float] = (5.0, 300.0)
+# Wire contract this client was written against. The fixture
+# ``tests/fixtures/proxbox_api_ceph_v2_contract.v1.json`` is derived from the
+# proxbox-api Pydantic models at the recorded commit; the digest pins the exact
+# bytes so a regenerated fixture is a visible change on both sides.
+PROXBOX_API_V2_CONTRACT_VERSION = "proxbox-api-ceph-v2-2026-09"
+PROXBOX_API_V2_CONTRACT_BACKEND_COMMIT = "4510af90"
+PROXBOX_API_V2_CONTRACT_SHA256 = "91f0b212085c3fcb43fb43de4dfa2b4c27980880eeb9d4db8070a7d6f20918dc"
 _REASON_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 _RECOVERY_KEYS = (
     "approval_id",
@@ -334,8 +341,10 @@ class CephOrchestratorClient:
             actor=actor,
         )
 
-    def approval_status(self, approval_id: str) -> dict[str, Any]:
-        return self._request_json("get", f"ceph/v2/approvals/{approval_id}")
+    def approval_status(self, approval_id: str, *, actor: str | None = None) -> dict[str, Any]:
+        # The backend does not bind the status read to an actor today; sending
+        # the header is forward-compatible with the planned actor binding.
+        return self._request_json("get", f"ceph/v2/approvals/{approval_id}", actor=actor)
 
     def operation(self, operation_id: str) -> dict[str, Any]:
         return self._request_json("get", f"ceph/v2/operations/{operation_id}")

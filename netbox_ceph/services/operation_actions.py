@@ -1267,7 +1267,10 @@ def _approval_status_run_id(
     operation: CephOperation,
 ) -> str:
     try:
-        status_payload = orchestrator.approval_status(approval.backend_approval_id)
+        status_payload = orchestrator.approval_status(
+            approval.backend_approval_id,
+            actor=_approval_actor_names(approval)[0],
+        )
         _validate_approval_status_binding(status_payload, approval=approval, plan=plan)
     except CephBackendError as exc:
         _mark_outcome_unknown(run, operation, approval)

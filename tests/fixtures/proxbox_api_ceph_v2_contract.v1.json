@@ -1,0 +1,402 @@
+{
+  "contract_version": "proxbox-api-ceph-v2-2026-09",
+  "backend": {
+    "repository": "proxbox-api",
+    "branch": "develop",
+    "commit": "4510af90",
+    "schema_module": "proxbox_api/ceph/v2_schemas.py",
+    "routes_module": "proxbox_api/ceph/v2_routes.py",
+    "generated": "2026-09-15",
+    "models": {
+      "PlanRequest": {
+        "extra": "allow",
+        "required": [],
+        "properties": [
+          "actor",
+          "desired_state",
+          "endpoint_id",
+          "netbox_branch_schema_id",
+          "operations",
+          "provider",
+          "request_id",
+          "scope",
+          "source_branch_schema_id"
+        ]
+      },
+      "PlanResponse": {
+        "required": [
+          "id",
+          "provider",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": [
+          "blocked_actions",
+          "created_at",
+          "digest",
+          "endpoint_config_revision",
+          "endpoint_id",
+          "expires_at",
+          "id",
+          "live_state_summary",
+          "netbox_branch_schema_id",
+          "operations",
+          "provider",
+          "request_summary",
+          "requester",
+          "source_branch_schema_id",
+          "validations",
+          "warnings"
+        ]
+      },
+      "ApplyRequest": {
+        "extra": "allow",
+        "required": [],
+        "properties": [
+          "actor",
+          "approval_token",
+          "confirm_destructive",
+          "confirmation_token",
+          "desired_state",
+          "endpoint_id",
+          "netbox_branch_schema_id",
+          "operations",
+          "plan_id",
+          "provider",
+          "request_id",
+          "scope",
+          "source_branch_schema_id"
+        ]
+      },
+      "ApprovalRequest": {
+        "extra": "ignore",
+        "required": [],
+        "properties": [
+          "endpoint_id"
+        ]
+      },
+      "ApprovalResponse": {
+        "required": [
+          "id",
+          "plan_id",
+          "plan_digest",
+          "requester",
+          "approver",
+          "token",
+          "expires_at"
+        ],
+        "properties": [
+          "approver",
+          "endpoint_config_revision",
+          "endpoint_id",
+          "expires_at",
+          "id",
+          "plan_digest",
+          "plan_id",
+          "requester",
+          "token"
+        ]
+      },
+      "ApprovalStatusResponse": {
+        "required": [
+          "id",
+          "plan_id",
+          "plan_digest",
+          "requester",
+          "approver",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": [
+          "approver",
+          "consumed_at",
+          "consumed_by",
+          "created_at",
+          "endpoint_config_revision",
+          "endpoint_id",
+          "expires_at",
+          "id",
+          "operation_run_id",
+          "plan_digest",
+          "plan_id",
+          "requester"
+        ]
+      },
+      "OperationRun": {
+        "required": [
+          "id",
+          "status",
+          "provider",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": [
+          "actor",
+          "approval_id",
+          "approver",
+          "created_at",
+          "endpoint_config_revision",
+          "endpoint_id",
+          "errors",
+          "events",
+          "id",
+          "lease_expires_at",
+          "plan_digest",
+          "plan_id",
+          "provider",
+          "provider_task_refs",
+          "request_summary",
+          "requester",
+          "result_summary",
+          "source_branch_schema_id",
+          "status",
+          "updated_at",
+          "warnings"
+        ]
+      },
+      "ReconcileRequest": {
+        "extra": "allow",
+        "required": [],
+        "properties": [
+          "actor",
+          "endpoint_id",
+          "netbox_branch_schema_id",
+          "provider",
+          "scope",
+          "source_branch_schema_id"
+        ]
+      },
+      "CapabilitiesResponse": {
+        "required": [
+          "providers"
+        ],
+        "properties": [
+          "providers"
+        ]
+      },
+      "MetricsResponse": {
+        "required": [
+          "provider"
+        ],
+        "properties": [
+          "metrics",
+          "provider",
+          "scope",
+          "snapshot",
+          "warnings"
+        ]
+      }
+    }
+  },
+  "actor_header": "X-Proxbox-Actor",
+  "routes": [
+    {
+      "client_method": "backend_capabilities",
+      "method": "GET",
+      "path": "ceph/v2/capabilities",
+      "actor_header": "none",
+      "query_params": [
+        "provider",
+        "endpoint_id"
+      ],
+      "response_model": "CapabilitiesResponse",
+      "plugin_reads": [],
+      "plugin_reads_legacy": [],
+      "note": "Client method exists; no plugin code consumes the response yet."
+    },
+    {
+      "client_method": "plan",
+      "method": "POST",
+      "path": "ceph/v2/plans",
+      "actor_header": "required",
+      "request_model": "PlanRequest",
+      "keys_sent": [
+        "id",
+        "cluster_id",
+        "provider_id",
+        "provider_kind",
+        "provider_name",
+        "provider",
+        "endpoint_id",
+        "operation_type",
+        "target_kind",
+        "target_ref",
+        "execution_node",
+        "desired",
+        "desired_state",
+        "is_destructive",
+        "confirmation_required",
+        "source_branch_schema_id"
+      ],
+      "response_model": "PlanResponse",
+      "plugin_reads": [
+        "id",
+        "digest",
+        "endpoint_id",
+        "endpoint_config_revision",
+        "expires_at",
+        "provider",
+        "operations",
+        "blocked_actions",
+        "warnings",
+        "validations",
+        "live_state_summary"
+      ],
+      "plugin_reads_legacy": [
+        "summary",
+        "intended_changes",
+        "expected_tasks",
+        "is_destructive",
+        "blast_radius",
+        "provider_target",
+        "rollback_limits"
+      ]
+    },
+    {
+      "client_method": "approve",
+      "method": "POST",
+      "path": "ceph/v2/plans/{plan_id}/approvals",
+      "actor_header": "required",
+      "request_model": "ApprovalRequest",
+      "keys_sent": [
+        "endpoint_id"
+      ],
+      "response_model": "ApprovalResponse",
+      "plugin_reads": [
+        "id",
+        "token",
+        "expires_at",
+        "plan_id",
+        "plan_digest",
+        "endpoint_id",
+        "endpoint_config_revision",
+        "requester",
+        "approver"
+      ],
+      "plugin_reads_legacy": []
+    },
+    {
+      "client_method": "apply",
+      "method": "POST",
+      "path": "ceph/v2/plans/{plan_id}/apply",
+      "actor_header": "required",
+      "request_model": "ApplyRequest",
+      "keys_sent": [
+        "plan_id",
+        "endpoint_id",
+        "approval_token"
+      ],
+      "response_model": "OperationRun",
+      "plugin_reads": [
+        "id",
+        "status",
+        "plan_id",
+        "plan_digest",
+        "endpoint_id",
+        "endpoint_config_revision",
+        "approval_id",
+        "requester",
+        "approver",
+        "actor",
+        "provider",
+        "provider_task_refs",
+        "errors",
+        "warnings"
+      ],
+      "plugin_reads_legacy": [
+        "provider_task_ref",
+        "task_ref"
+      ]
+    },
+    {
+      "client_method": "approval_status",
+      "method": "GET",
+      "path": "ceph/v2/approvals/{approval_id}",
+      "actor_header": "ignored",
+      "response_model": "ApprovalStatusResponse",
+      "plugin_reads": [
+        "id",
+        "plan_id",
+        "plan_digest",
+        "endpoint_id",
+        "endpoint_config_revision",
+        "expires_at",
+        "operation_run_id",
+        "requester",
+        "approver"
+      ],
+      "plugin_reads_legacy": []
+    },
+    {
+      "client_method": "operation",
+      "method": "GET",
+      "path": "ceph/v2/operations/{operation_id}",
+      "actor_header": "none",
+      "response_model": "OperationRun",
+      "plugin_reads": [
+        "id",
+        "status",
+        "plan_id",
+        "plan_digest",
+        "endpoint_id",
+        "endpoint_config_revision",
+        "approval_id",
+        "requester",
+        "approver",
+        "actor",
+        "provider",
+        "provider_task_refs",
+        "errors",
+        "warnings"
+      ],
+      "plugin_reads_legacy": [
+        "provider_task_ref",
+        "task_ref"
+      ]
+    },
+    {
+      "client_method": "reconcile",
+      "method": "POST",
+      "path": "ceph/v2/reconcile",
+      "actor_header": "optional",
+      "request_model": "ReconcileRequest",
+      "keys_sent": [
+        "provider",
+        "endpoint_id",
+        "scope"
+      ],
+      "response_model": "OperationRun",
+      "plugin_reads": [
+        "id",
+        "status",
+        "provider_task_refs"
+      ],
+      "plugin_reads_legacy": [
+        "provider_task_ref",
+        "task_ref"
+      ]
+    },
+    {
+      "client_method": "fetch_metrics",
+      "method": "GET",
+      "path": "ceph/v2/metrics",
+      "actor_header": "none",
+      "response_model": "MetricsResponse",
+      "plugin_reads": [],
+      "plugin_reads_legacy": [],
+      "note": "Client method exists; no plugin code consumes the response yet.",
+      "query_params": [
+        "provider",
+        "object_ref",
+        "endpoint_id"
+      ]
+    }
+  ],
+  "actor_header_policy": {
+    "required": "the backend rejects the request without the header; the client always sends it",
+    "optional": "the backend reads the header when present (soft fallback into the request actor); the client always sends it",
+    "ignored": "the backend does not bind the header today; the client still sends it when an actor is known",
+    "none": "the client does not send the header"
+  },
+  "snapshot_note": "Hand-derived snapshot of the backend models at backend.commit; it is not regenerated automatically. The tests prove plugin code agrees with this snapshot, not with a live backend."
+}

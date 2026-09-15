@@ -276,6 +276,29 @@ stores, serializes, renders, or logs the raw token or token hash.
 Unsupported operations fail clearly. Do not add shell command fallbacks or local
 Ceph CLI execution paths.
 
+The wire contract the client is written against is pinned as data:
+`tests/fixtures/proxbox_api_ceph_v2_contract.v1.json` records, per client
+method, the route, the actor-header policy, the keys the plugin sends, the
+backend request model's required/declared keys, and the response keys the
+plugin reads (`plugin_reads`) or tolerates as legacy fallbacks
+(`plugin_reads_legacy`). It is derived from proxbox-api's
+`proxbox_api/ceph/v2_schemas.py` at the commit in its `backend` block and its
+SHA-256 is pinned in `orchestrator.PROXBOX_API_V2_CONTRACT_SHA256`.
+`tests/test_proxbox_api_v2_contract.py` walks every public
+`CephOrchestratorClient` method against it and checks the declared reads
+against `operation_actions.py`/`ceph_v2_responses.py`. The fixture is a
+reviewed snapshot rather than a live probe: the tests prove the plugin agrees
+with the snapshot, and re-deriving the snapshot from the backend models is the
+review step when its backend commit is bumped. The per-route `actor_header`
+value records the backend's behaviour (`required`, `optional`, `ignored`) or
+`none` when the client does not send the header; the client contract is the
+same for the first three — send the actor whenever one is known. Adding a client method,
+sending a new key, or reading a new response key means updating the fixture and
+digest in the same change; regenerating it for a newer backend also updates
+the proxbox-api floor in `COMPATIBILITY.md`. `approval_status()` sends the
+`X-Proxbox-Actor` header when an actor is known; the backend ignores it today
+and is expected to bind the status read to the actor later.
+
 ## Orchestrator Response Mapping
 
 proxbox-api (#95, hardened by #258) returns `PlanResponse`/`OperationRun` with `operations`,

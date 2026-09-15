@@ -466,7 +466,7 @@ def test_two_transport_failures_become_outcome_unknown_without_third_dispatch(ac
             calls.append((plan_id, kwargs))
             raise actions.CephOrchestratorTimeout("timeout")
 
-        def approval_status(self, approval_id):
+        def approval_status(self, approval_id, *, actor=None):
             raise actions.CephOrchestratorUnavailable("offline")
 
     with pytest.raises(actions.OperationActionError) as excinfo:
@@ -627,8 +627,9 @@ def test_ambiguous_http_apply_retries_once_then_recovers_by_approval(actions) ->
             calls.append(kwargs)
             raise actions.CephOrchestratorHTTPError(503, "upstream_unavailable", "safe")
 
-        def approval_status(self, approval_id):
+        def approval_status(self, approval_id, *, actor=None):
             assert approval_id == "approval-1"
+            assert actor == "requester"
             return {
                 **_approval_payload(actions),
                 "operation_run_id": "run-1",

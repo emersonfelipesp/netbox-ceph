@@ -19,7 +19,7 @@ The shared compatibility module is vendored byte-identically across
 
 | Plugin release | NetBox releases | Python | netbox-proxbox | proxbox-api |
 |---|---|---|---|---|
-| v0.0.1.post1 branch | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | Required |
+| v0.0.1.post1 branch | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | Required; v2 plan/approve/apply needs the approval routes (see below) |
 
 Fail-closed branch isolation is guaranteed on every supported `netbox-proxbox`
 version. The typed branching decision contract is consumed automatically from
@@ -33,6 +33,28 @@ uses the exact NetBox source revision
 `5f06007e4c9bacc93ce17c1e645fc1143d60df3d`, and the Docker smoke matrix uses
 the pinned official image
 `netboxcommunity/netbox:v4.7.0-5.1.0@sha256:73a54ff279461170032b59a57a1930929965e3ba15c195af59f4b5f6d39a84a9`.
+
+## proxbox-api v2 contract
+
+The v1 reflection sync (`/ceph/sync/*`) works against every published
+proxbox-api release that serves those routes. The v2 plan → approve → apply flow
+additionally needs `POST /ceph/v2/plans/{id}/approvals` and
+`GET /ceph/v2/approvals/{id}`, plus an apply route that accepts
+`approval_token`. Those routes exist on the backend `develop` branch from
+commit `4510af90`, which still carries the 0.0.22 version string; they ship in
+the first proxbox-api release cut after that commit (planned as 0.0.23). No
+published release up to and including 0.0.22 serves them. Against an older backend the plugin fails closed at
+approval: the orchestrator translates the 404 into
+`CephOrchestratorUnsupported` and the operation is left unapproved with a
+named backend reason instead of a generic transport error.
+
+The pinned wire contract lives in
+`tests/fixtures/proxbox_api_ceph_v2_contract.v1.json` (a reviewed snapshot of
+the backend request and response key sets at the recorded commit, digest-pinned
+in `netbox_ceph.services.orchestrator.PROXBOX_API_V2_CONTRACT_SHA256`). The
+plugin tests prove the client and the snapshot agree; re-deriving the snapshot
+from `proxbox_api/ceph/v2_schemas.py` is the review step whenever the backend
+commit is bumped. Bump the fixture, the digest, and this section together.
 
 ## Upgrade procedure
 
