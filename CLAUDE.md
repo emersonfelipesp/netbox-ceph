@@ -202,8 +202,14 @@ that keeps the stored value when submitted blank
 (`validators.keep_stored_reference`). No migration rewrites data; system check
 `netbox_ceph.W002` (a warning, so legacy rows never block startup) reports
 offending provider ids without their values. Recognized secret shapes are a
-tripwire only; an unknown shape within the pointer charset still passes. Any
-new field that holds a secret-store pointer must reuse the same validator.
+tripwire only; an unknown shape within the pointer charset still passes. Bare
+32/40/64-character hex digests are advisory (`_ADVISORY_MATERIAL_PATTERNS`):
+rejected for a new value, accepted when `clean()` sees the value equal to the
+row's persisted reference (`stored=`), still reported by `W002`. The form and
+serializer field validators never receive `stored`, so re-sending the same hex
+value through the API is rejected; omit the field to keep it. Token-prefix
+and URL shapes block regardless. Any new field that holds a secret-store
+pointer must reuse the same validator.
 
 ## Ceph v1 Reflection Sync Dispatch
 

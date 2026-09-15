@@ -35,6 +35,9 @@ CREDENTIAL_MATERIAL = (
     pytest.param("xoxb-" + "1" * 12 + "-" + "2" * 12 + "-" + "a" * 24, id="slack-bot"),
     pytest.param("xoxp-" + "1" * 12 + "-" + "a" * 24, id="slack-user"),
     pytest.param("glpat-" + "a" * 20, id="gitlab-pat"),
+)
+
+ADVISORY_MATERIAL = (
     pytest.param("0123456789abcdef" * 2, id="hex-32"),
     pytest.param("0123456789abcdef" * 2 + "01234567", id="hex-40-shaped-pat"),
     pytest.param("0123456789abcdef" * 4, id="hex-64"),
@@ -61,10 +64,41 @@ def test_policy_accepts_an_absent_reference(value: object) -> None:
     validate_credential_ref(value)
 
 
-@pytest.mark.parametrize("value", (*CREDENTIAL_MATERIAL, *MALFORMED_REFERENCES))
+@pytest.mark.parametrize("value", (*CREDENTIAL_MATERIAL, *ADVISORY_MATERIAL, *MALFORMED_REFERENCES))
 def test_policy_rejects_credential_material_and_malformed_references(value: object) -> None:
-    with pytest.raises(SecretBearingIntentError, match="credential_ref must be an opaque"):
+    with pytest.raises(SecretBearingIntentError, match="^credential_ref "):
         validate_credential_ref(value)
+
+
+@pytest.mark.parametrize("value", ADVISORY_MATERIAL)
+def test_policy_accepts_an_unchanged_stored_advisory_reference(value: str) -> None:
+    validate_credential_ref(value, stored=value)
+
+
+@pytest.mark.parametrize("value", ADVISORY_MATERIAL)
+def test_policy_rejects_an_advisory_reference_that_differs_from_the_stored_one(
+    value: str,
+) -> None:
+    with pytest.raises(SecretBearingIntentError):
+        validate_credential_ref(value, stored="vault://ceph")
+    with pytest.raises(SecretBearingIntentError):
+        validate_credential_ref(value, stored="")
+    with pytest.raises(SecretBearingIntentError):
+        validate_credential_ref(value, stored=None)
+
+
+@pytest.mark.parametrize("value", CREDENTIAL_MATERIAL)
+def test_policy_rejects_unambiguous_material_even_when_unchanged(value: str) -> None:
+    with pytest.raises(SecretBearingIntentError):
+        validate_credential_ref(value, stored=value)
+
+
+def test_advisory_rejection_message_does_not_echo_the_value() -> None:
+    value = "0123456789abcdef" * 2
+    with pytest.raises(SecretBearingIntentError) as excinfo:
+        validate_credential_ref(value, path="parameters.credential_ref")
+    assert "parameters.credential_ref" in str(excinfo.value)
+    assert value not in str(excinfo.value)
 
 
 def test_policy_error_names_the_field_path_without_echoing_the_value() -> None:
@@ -264,16 +298,43 @@ def test_provider_form_validates_and_never_renders_the_reference() -> None:
     )
 
 
-def test_provider_model_clean_applies_the_shared_validator() -> None:
-    model = _class_source("netbox_ceph/models/providers.py", "CephProvider")
-    clean = next(n for n in model.body if isinstance(n, ast.FunctionDef) and n.name == "clean")
-    called = {
-        node.func.id
-        for node in ast.walk(clean)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
+def _method(class_node: ast.ClassDef, name: str) -> ast.FunctionDef | None:
+    return next(
+        (n for n in class_node.body if isinstance(n, ast.FunctionDef) and n.name == name),
+        None,
+    )
 
-    assert "validate_credential_reference" in called
+
+def _calls_to(node: ast.AST, function_name: str) -> list[ast.Call]:
+    return [
+        call
+        for call in ast.walk(node)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == function_name
+    ]
+
+
+def test_provider_model_clean_applies_the_shared_validator_with_the_stored_value() -> None:
+    model = _class_source("netbox_ceph/models/providers.py", "CephProvider")
+    clean = _method(model, "clean")
+    assert clean is not None
+    calls = _calls_to(clean, "validate_credential_reference")
+
+    assert len(calls) == 1
+    assert {keyword.arg for keyword in calls[0].keywords} == {"stored"}
+
+
+def test_provider_model_reads_the_stored_reference_by_primary_key() -> None:
+    model = _class_source("netbox_ceph/models/providers.py", "CephProvider")
+    assert _method(model, "_stored_credential_ref") is not None
+
+
+def test_django_validator_forwards_the_stored_value(validators_module) -> None:
+    legacy = "0123456789abcdef" * 2
+    validators_module.validate_credential_reference(legacy, stored=legacy)
+    with pytest.raises(_ValidationError):
+        validators_module.validate_credential_reference(legacy)
 
 
 def test_provider_table_does_not_expose_the_reference() -> None:

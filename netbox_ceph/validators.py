@@ -11,11 +11,16 @@ from netbox_ceph.services.redaction import (
 )
 
 
-def validate_credential_reference(value: object) -> None:
-    """Adapt the pure credential-reference policy to Django field validation."""
+def validate_credential_reference(value: object, *, stored: object = None) -> None:
+    """Adapt the pure credential-reference policy to Django field validation.
+
+    Pass ``stored`` (the persisted value of the same row) from model ``clean()``
+    so an unchanged legacy bare-hex reference is accepted; field and serializer
+    validators run without it, so any newly submitted value faces the full policy.
+    """
 
     try:
-        validate_credential_ref(value)
+        validate_credential_ref(value, stored=stored)
     except SecretBearingIntentError as exc:
         raise ValidationError(
             _(str(exc)),

@@ -212,11 +212,22 @@ in `netbox_ceph.validators.validate_credential_reference` (backed by
 pointer — up to 255 characters from `A-Z a-z 0-9 . _ : / @ -`, starting with a
 letter or digit, no whitespace — and rejects recognizable credential material
 such as AWS access keys, GitHub and GitLab tokens, Slack tokens, JWTs, Stripe or
-OpenAI keys, bare 32/40/64-character hex digests, and URLs carrying
-`user:password@`. The shape list is a tripwire, not proof: an unrecognized
-secret that fits the pointer charset still passes, so the policy complements,
-rather than replaces, keeping secrets in the secret store. The rule is applied by `CephProvider.clean()`, by
-the `CephProviderForm` field, and by the `CephProviderSerializer` field.
+OpenAI keys, and URLs carrying `user:password@`. Bare 32/40/64-character hex
+digests are an *advisory* shape: they are usually leaked digests but can also
+be a legitimate opaque id (a dashless UUID), so a newly submitted hex value is
+rejected while a stored one that is re-saved unchanged is accepted — an
+existing provider whose reference is a bare hex id can still be edited, and
+`W002` keeps reporting it until an operator replaces it. The unambiguous token
+and URL shapes are rejected even when unchanged. The shape list is a tripwire,
+not proof: an unrecognized secret that fits the pointer charset still passes,
+so the policy complements, rather than replaces, keeping secrets in the secret
+store. The rule is applied by `CephProvider.clean()` (which passes the row's
+persisted value as `stored=`), by the `CephProviderForm` field, and by the
+`CephProviderSerializer` field; the two field validators run without the stored
+value, so any value actually typed or sent faces the full policy — including an
+API request that re-sends the same bare-hex value. To leave a legacy hex
+reference untouched, omit `credential_ref` from the API payload or leave the
+form field blank.
 
 The reference is write-only on every surface: the API serializer never
 returns it, the provider table does not list it, and the form renders a

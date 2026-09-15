@@ -34,8 +34,12 @@ _CREDENTIAL_MATERIAL_PATTERNS = (
     re.compile(r"^sk-(?:(?:proj|svcacct)-)?[A-Za-z0-9_-]{16,}$"),
     re.compile(r"^xox[abeprs]-[A-Za-z0-9-]{10,}$"),
     re.compile(r"^glpat-[A-Za-z0-9_-]{20,}$"),
-    re.compile(r"^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$"),
 )
+# Shapes that are usually leaked digests but are also plausible opaque pointers
+# (a dashless UUID, a content id). They block a *new* value and are reported for
+# stored rows, but an unchanged stored value is accepted so a legacy row can
+# still be edited.
+_ADVISORY_MATERIAL_PATTERNS = (re.compile(r"^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$"),)
 _FORBIDDEN_SECRET_TOKENS = {"password", "passwd", "secret", "token", "credential"}
 _FORBIDDEN_FLAT_KEYS = {
     "apikey",
@@ -61,18 +65,41 @@ def _normalized_key_parts(key: object) -> tuple[str, tuple[str, ...]]:
     return "".join(parts), parts
 
 
-def validate_credential_ref(value: object, *, path: str = "credential_ref") -> None:
-    """Require a bounded opaque pointer and reject recognizable secret values."""
+def validate_credential_ref(
+    value: object,
+    *,
+    path: str = "credential_ref",
+    stored: object = None,
+) -> None:
+    """Require a bounded opaque pointer and reject recognizable secret values.
+
+    ``stored`` is the value already persisted for the same row. Advisory shapes
+    (bare hex digests) are rejected for a new value but accepted when ``value``
+    is exactly the stored one, so a legacy row survives unrelated edits; the
+    unambiguous token and URL shapes are rejected regardless.
+    """
     if value in (None, ""):
         return
-    if (
-        not isinstance(value, str)
-        or not _CREDENTIAL_REF_PATTERN.fullmatch(value)
-        or any(pattern.search(value) for pattern in _CREDENTIAL_MATERIAL_PATTERNS)
-    ):
+    if not _is_opaque_pointer(value):
         raise SecretBearingIntentError(
             f"{path} must be an opaque credential reference, not credential material."
         )
+    if value != stored and _matches_any(value, _ADVISORY_MATERIAL_PATTERNS):
+        raise SecretBearingIntentError(
+            f"{path} looks like a bare secret digest; use an opaque credential reference."
+        )
+
+
+def _matches_any(value: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    return any(pattern.search(value) for pattern in patterns)
+
+
+def _is_opaque_pointer(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and _CREDENTIAL_REF_PATTERN.fullmatch(value) is not None
+        and not _matches_any(value, _CREDENTIAL_MATERIAL_PATTERNS)
+    )
 
 
 def validate_secret_free_intent(payload: Any, *, path: str = "intent") -> None:
