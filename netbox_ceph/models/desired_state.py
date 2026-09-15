@@ -30,6 +30,7 @@ from netbox_ceph.services.redaction import (
     SecretBearingIntentError,
     validate_secret_free_intent,
 )
+from netbox_ceph.validators import stored_field_value, validate_credential_reference
 
 _EXECUTION_NODE_VALIDATOR = RegexValidator(
     regex=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
@@ -37,18 +38,43 @@ _EXECUTION_NODE_VALIDATOR = RegexValidator(
 )
 
 
+_CREDENTIAL_REF_FIELD = "credential_ref"
+
+
 class _SecretFreeDesiredStateMixin:
-    """Enforce the no-credential invariant on model and ModelForm paths."""
+    """Enforce the no-credential invariant on model and ModelForm paths.
+
+    ``credential_ref`` (when listed in ``intent_fields``) is validated as a
+    field-scoped error through the shared credential-reference policy, with
+    the row's persisted value passed so an unchanged legacy advisory value
+    stays editable; every other intent field goes through the recursive
+    secret-free check.
+    """
 
     intent_fields: tuple[str, ...] = ()
 
     def clean(self) -> None:
         super().clean()
-        intent = {field: getattr(self, field) for field in self.intent_fields}
+        if _CREDENTIAL_REF_FIELD in self.intent_fields:
+            self._clean_credential_ref()
+        intent = {
+            field: getattr(self, field)
+            for field in self.intent_fields
+            if field != _CREDENTIAL_REF_FIELD
+        }
         try:
             validate_secret_free_intent(intent)
         except SecretBearingIntentError as exc:
             raise ValidationError({"__all__": _(str(exc))}) from exc
+
+    def _clean_credential_ref(self) -> None:
+        try:
+            validate_credential_reference(
+                getattr(self, _CREDENTIAL_REF_FIELD),
+                stored=stored_field_value(self, _CREDENTIAL_REF_FIELD),
+            )
+        except ValidationError as exc:
+            raise ValidationError({_CREDENTIAL_REF_FIELD: exc}) from exc
 
 
 class CephPoolDesiredState(_SecretFreeDesiredStateMixin, NetBoxModel):

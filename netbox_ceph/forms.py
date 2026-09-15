@@ -523,6 +523,26 @@ class CephRGWZoneDesiredStateForm(NetBoxModelForm):
 
 
 class CephRGWUserDesiredStateForm(NetBoxModelForm):
+    credential_ref = forms.CharField(
+        required=False,
+        max_length=255,
+        strip=False,
+        validators=(validate_credential_reference,),
+        widget=forms.PasswordInput(render_value=False),
+        help_text=_(
+            "Opaque pointer to the user's S3 keys in proxbox-api. The saved value is never "
+            "rendered or returned by the API; leave blank to keep the current reference."
+        ),
+    )
+
+    def clean_credential_ref(self) -> str:
+        """Keep the stored reference when the never-rendered field is submitted blank."""
+
+        return keep_stored_reference(
+            self.cleaned_data.get("credential_ref"),
+            getattr(self.instance, "credential_ref", ""),
+        )
+
     class Meta:
         model = CephRGWUserDesiredState
         fields = (

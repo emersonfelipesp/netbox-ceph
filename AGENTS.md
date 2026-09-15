@@ -220,8 +220,13 @@ rejected for a new value, accepted when `clean()` sees the value equal to the
 row's persisted reference (`stored=`), still reported by `W002`. The form and
 serializer field validators never receive `stored`, so re-sending the same hex
 value through the API is rejected; omit the field to keep it. Token-prefix
-and URL shapes block regardless. Any new field that holds a secret-store
-pointer must reuse the same validator.
+and URL shapes block regardless. `CephRGWUserDesiredState.credential_ref` is
+held to the same contract through `_SecretFreeDesiredStateMixin`
+(`_clean_credential_ref`, field-scoped, `stored=` aware), the form field
+(password input + `keep_stored_reference`), the write-only serializer field,
+the table (column removed), and system check `netbox_ceph.W003`. Any new
+field that holds a secret-store pointer must reuse the same validator and add
+a sibling check through `checks._credential_reference_warnings`.
 
 ## Ceph v1 Reflection Sync Dispatch
 

@@ -1050,7 +1050,6 @@ class CephRGWUserDesiredStateTable(NetBoxTable):
             "max_buckets",
             "quota_max_size_bytes",
             "quota_max_objects",
-            "credential_ref",
             "actions",
         )
         default_columns = (

@@ -239,7 +239,10 @@ Existing rows are not rewritten. The Django system check
 `netbox_ceph.W002` (`netbox_ceph.checks.check_provider_credential_references`)
 reports, as a warning that never blocks `migrate` or startup, the ids of providers whose stored reference fails the policy so an
 operator can replace them; it never prints the stored value and stays silent
-until the plugin's tables exist.
+until the plugin's tables exist. The sibling check `netbox_ceph.W003`
+(`check_rgw_user_credential_references`) does the same for
+`CephRGWUserDesiredState.credential_ref`, which is validated, hidden, and kept
+on blank submission exactly like the provider field (see `docs/v2/desired-state.md`).
 
 ### CephOperation
 

@@ -120,6 +120,17 @@ credential-related desired-state field, and it is an opaque pointer to keys held
 by proxbox-api or its secret store. Do not add `access_key`, `secret_key`,
 `password`, or `token` fields to these models or serializers.
 
+`CephRGWUserDesiredState.credential_ref` follows the same rules as
+`CephProvider.credential_ref` (see the CephProvider section of `models.md`):
+the shared policy `netbox_ceph.validators.validate_credential_reference` runs
+on the model `clean()` (as a field-scoped error, with the row's persisted
+value so an unchanged legacy bare-hex value stays editable), on the
+`CephRGWUserDesiredStateForm` field, and on the serializer field. The value is
+write-only on the REST API, absent from the desired-state table, and rendered
+as a password-style input that keeps the stored reference when submitted
+blank. System check `netbox_ceph.W003` reports existing rows whose stored
+reference fails the policy without printing the value.
+
 ## Reconciliation Path
 
 Supported desired-state objects feed the plan/apply engine. An operator (or

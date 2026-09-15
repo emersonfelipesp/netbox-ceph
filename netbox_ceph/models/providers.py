@@ -10,7 +10,7 @@ from netbox.models import NetBoxModel
 from utilities.json import CustomFieldJSONEncoder
 
 from netbox_ceph.choices import CephProviderKindChoices, CephProviderStatusChoices
-from netbox_ceph.validators import validate_credential_reference
+from netbox_ceph.validators import stored_field_value, validate_credential_reference
 
 
 class CephProvider(NetBoxModel):
@@ -70,19 +70,12 @@ class CephProvider(NetBoxModel):
 
         super().clean()
         try:
-            validate_credential_reference(self.credential_ref, stored=self._stored_credential_ref())
+            validate_credential_reference(
+                self.credential_ref,
+                stored=stored_field_value(self, "credential_ref"),
+            )
         except ValidationError as exc:
             raise ValidationError({"credential_ref": exc}) from exc
-
-    def _stored_credential_ref(self) -> str:
-        """Return the persisted reference for this row, or ``""`` for a new row."""
-
-        if self.pk is None:
-            return ""
-        stored = (
-            type(self).objects.filter(pk=self.pk).values_list("credential_ref", flat=True).first()
-        )
-        return stored or ""
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ceph:cephprovider", args=[self.pk])

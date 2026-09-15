@@ -40,3 +40,18 @@ def keep_stored_reference(submitted: object, stored: object) -> str:
     if value:
         return value
     return str(stored or "")
+
+
+def stored_field_value(instance: object, field_name: str) -> str:
+    """Return the persisted value of ``field_name`` for ``instance``, or ``""``.
+
+    A new row (no primary key) and a row that no longer exists both yield an
+    empty string, so the advisory-shape exemption never applies to them.
+    """
+
+    pk = getattr(instance, "pk", None)
+    if pk is None:
+        return ""
+    manager = type(instance).objects  # type: ignore[attr-defined]
+    stored = manager.filter(pk=pk).values_list(field_name, flat=True).first()
+    return stored or ""

@@ -184,30 +184,52 @@ def test_django_validator_translates_policy_errors(validators_module) -> None:
     assert "opaque credential reference" in str(excinfo.value.message)
 
 
-def _install_provider_model(monkeypatch: pytest.MonkeyPatch, rows, *, error=None):
-    class _Query:
-        def exclude(self, **kwargs):
-            assert kwargs == {"credential_ref": ""}
-            return self
+class _RowQuery:
+    def __init__(self, rows, error) -> None:
+        self._rows = rows
+        self._error = error
 
-        def values_list(self, *fields):
-            assert fields == ("pk", "credential_ref")
-            return self
+    def exclude(self, **kwargs):
+        assert kwargs == {"credential_ref": ""}
+        return self
 
-        def iterator(self):
-            if error is not None:
-                raise error
-            return iter(rows)
+    def values_list(self, *fields):
+        assert fields == ("pk", "credential_ref")
+        return self
+
+    def iterator(self):
+        if self._error is not None:
+            raise self._error
+        return iter(self._rows)
+
+
+def _install_models(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_rows,
+    rgw_user_rows=(),
+    *,
+    error=None,
+):
+    """Stub both credential-bearing models so ``checks.py`` imports without Django."""
 
     providers = types.ModuleType("netbox_ceph.models.providers")
-    providers.CephProvider = type("CephProvider", (), {"objects": _Query()})
+    providers.CephProvider = type("CephProvider", (), {"objects": _RowQuery(provider_rows, error)})
+    desired = types.ModuleType("netbox_ceph.models.desired_state")
+    desired.CephRGWUserDesiredState = type(
+        "CephRGWUserDesiredState", (), {"objects": _RowQuery(rgw_user_rows, error)}
+    )
     monkeypatch.setitem(sys.modules, "netbox_ceph.models.providers", providers)
+    monkeypatch.setitem(sys.modules, "netbox_ceph.models.desired_state", desired)
     monkeypatch.setitem(
         sys.modules,
         "netbox_ceph.validators",
         _load("tests._netbox_ceph_validators_under_test", "netbox_ceph/validators.py"),
     )
-    return providers.CephProvider
+    return providers.CephProvider, desired.CephRGWUserDesiredState
+
+
+def _install_provider_model(monkeypatch: pytest.MonkeyPatch, rows, *, error=None):
+    return _install_models(monkeypatch, rows, error=error)[0]
 
 
 def test_system_check_reports_offending_rows_without_their_values(
@@ -221,7 +243,10 @@ def test_system_check_reports_offending_rows_without_their_values(
 
     errors = checks.check_provider_credential_references(app_configs=None)
 
-    assert django_stubs.registered == [checks.check_provider_credential_references]
+    assert django_stubs.registered == [
+        checks.check_provider_credential_references,
+        checks.check_rgw_user_credential_references,
+    ]
     assert [error.id for error in errors] == ["netbox_ceph.W002", "netbox_ceph.W002"]
     assert [error.obj for error in errors] == [model, model]
     assert "id=2" in errors[0].hint and "id=3" in errors[1].hint
@@ -241,10 +266,39 @@ def test_system_check_is_silent_before_migrations_exist(
 
 
 def test_system_check_passes_for_valid_rows(monkeypatch: pytest.MonkeyPatch, django_stubs) -> None:
-    _install_provider_model(monkeypatch, [(1, "vault://ceph"), (2, "openbao/ceph")])
+    _install_models(
+        monkeypatch, [(1, "vault://ceph"), (2, "openbao/ceph")], [(7, "vault://s3/alice")]
+    )
     checks = _load("tests._netbox_ceph_checks_under_test", "netbox_ceph/checks.py")
 
     assert checks.check_provider_credential_references() == []
+    assert checks.check_rgw_user_credential_references() == []
+
+
+def test_rgw_user_system_check_reports_offending_rows_without_their_values(
+    monkeypatch: pytest.MonkeyPatch, django_stubs
+) -> None:
+    secret = "AKIA" + "B" * 16
+    _, model = _install_models(
+        monkeypatch, [(1, "vault://ceph")], [(5, "vault://s3/alice"), (6, secret)]
+    )
+    checks = _load("tests._netbox_ceph_checks_under_test", "netbox_ceph/checks.py")
+
+    errors = checks.check_rgw_user_credential_references()
+
+    assert [error.id for error in errors] == ["netbox_ceph.W003"]
+    assert errors[0].obj is model
+    assert "CephRGWUserDesiredState id=6" in errors[0].hint
+    assert secret not in errors[0].hint and secret not in errors[0].msg
+
+
+def test_rgw_user_system_check_is_silent_before_migrations_exist(
+    monkeypatch: pytest.MonkeyPatch, django_stubs
+) -> None:
+    _install_models(monkeypatch, [], [], error=django_stubs.OperationalError("no relation"))
+    checks = _load("tests._netbox_ceph_checks_under_test", "netbox_ceph/checks.py")
+
+    assert checks.check_rgw_user_credential_references() == []
 
 
 def _class_source(relative_path: str, class_name: str) -> ast.ClassDef:
@@ -325,9 +379,67 @@ def test_provider_model_clean_applies_the_shared_validator_with_the_stored_value
     assert {keyword.arg for keyword in calls[0].keywords} == {"stored"}
 
 
-def test_provider_model_reads_the_stored_reference_by_primary_key() -> None:
+def test_provider_model_reads_the_stored_reference_through_the_shared_helper() -> None:
     model = _class_source("netbox_ceph/models/providers.py", "CephProvider")
-    assert _method(model, "_stored_credential_ref") is not None
+    clean = _method(model, "clean")
+    assert clean is not None
+    assert len(_calls_to(clean, "stored_field_value")) == 1
+
+
+def test_desired_state_mixin_validates_credential_ref_with_the_stored_value() -> None:
+    mixin = _class_source("netbox_ceph/models/desired_state.py", "_SecretFreeDesiredStateMixin")
+    helper = _method(mixin, "_clean_credential_ref")
+    assert helper is not None
+    calls = _calls_to(helper, "validate_credential_reference")
+    assert len(calls) == 1
+    assert {keyword.arg for keyword in calls[0].keywords} == {"stored"}
+    assert len(_calls_to(helper, "stored_field_value")) == 1
+    clean = _method(mixin, "clean")
+    assert clean is not None
+    assert any(
+        isinstance(node, ast.Attribute) and node.attr == "_clean_credential_ref"
+        for node in ast.walk(clean)
+    )
+
+
+def test_rgw_user_model_lists_credential_ref_as_intent() -> None:
+    model = _class_source("netbox_ceph/models/desired_state.py", "CephRGWUserDesiredState")
+    intent = next(
+        node
+        for node in model.body
+        if isinstance(node, ast.Assign) and node.targets[0].id == "intent_fields"  # type: ignore[attr-defined]
+    )
+    assert "credential_ref" in ast.literal_eval(intent.value)
+
+
+def test_rgw_user_serializer_never_returns_the_reference() -> None:
+    serializer = _class_source(
+        "netbox_ceph/api/serializers.py", "CephRGWUserDesiredStateSerializer"
+    )
+    keywords = _field_keywords(serializer, "credential_ref")
+
+    assert ast.literal_eval(keywords["write_only"]) is True
+    assert "validate_credential_reference" in _validators_of(keywords)
+
+
+def test_rgw_user_form_validates_and_never_renders_the_reference() -> None:
+    form = _class_source("netbox_ceph/forms.py", "CephRGWUserDesiredStateForm")
+    keywords = _field_keywords(form, "credential_ref")
+
+    assert "validate_credential_reference" in _validators_of(keywords)
+    widget = keywords["widget"]
+    assert isinstance(widget, ast.Call) and widget.func.attr == "PasswordInput"
+    assert {k.arg: ast.literal_eval(k.value) for k in widget.keywords} == {"render_value": False}
+    clean = _method(form, "clean_credential_ref")
+    assert clean is not None
+    assert len(_calls_to(clean, "keep_stored_reference")) == 1
+
+
+def test_rgw_user_table_does_not_expose_the_reference() -> None:
+    table = _class_source("netbox_ceph/tables.py", "CephRGWUserDesiredStateTable")
+    literals = {node.value for node in ast.walk(table) if isinstance(node, ast.Constant)}
+
+    assert "credential_ref" not in literals
 
 
 def test_django_validator_forwards_the_stored_value(validators_module) -> None:
