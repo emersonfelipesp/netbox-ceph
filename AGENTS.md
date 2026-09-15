@@ -225,6 +225,16 @@ open with `branch_disposition.status="left_open"` and
 `reason="ceph_sync_stage_failed"`. v1 HTTP transport errors store only the
 status/path summary in job data, never raw proxbox-api response bodies.
 
+## Branch isolation: fail closed
+
+`CephPluginSettings.branching_enabled=False` is the only state that permits Ceph
+sync writes directly to the main schema. When the setting is `True`, the job
+must resolve a working `netbox-branching` runtime before its first inventory
+write. An unreadable settings row, missing or broken netbox-proxbox lifecycle
+helper, or unavailable branching runtime raises `BranchingUnavailableError` and
+terminates the job. Never convert these failures to disabled branching or retry
+the sync against main.
+
 ## Orchestrator Feature Detection
 
 `netbox_ceph.services.orchestrator.CephOrchestratorClient` calls proxbox-api

@@ -51,6 +51,16 @@ from netbox_ceph.models import (
 
 
 class CephPluginSettingsForm(NetBoxModelForm):
+    branching_enabled = forms.BooleanField(
+        required=False,
+        label=_("Branching-enabled sync (Ceph -> NetBox)"),
+        help_text=_(
+            "Require Ceph sync jobs to use a working netbox-branching runtime. "
+            "If the runtime is unavailable, the job refuses to run and never "
+            "falls back to direct writes on main."
+        ),
+    )
+
     class Meta:
         model = CephPluginSettings
         fields = (

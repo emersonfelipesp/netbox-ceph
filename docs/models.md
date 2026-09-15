@@ -24,7 +24,7 @@ the Ceph sync job.
 
 | Field | Type | Description |
 |---|---|---|
-| `branching_enabled` | bool | Enable per-sync `netbox-branching` branch |
+| `branching_enabled` | bool | Require per-sync `netbox-branching` isolation; unavailable branching fails the job before writes |
 | `branch_name_prefix` | str | Prefix for auto-created branch names (default `ceph-sync`) |
 | `branch_on_conflict` | str | `fail` or `acknowledge` — what to do when a branch merge conflicts |
 

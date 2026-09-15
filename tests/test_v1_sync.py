@@ -8,6 +8,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -75,6 +76,11 @@ def jobs_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "netbox.jobs", netbox_jobs)
 
     branch_lifecycle = types.ModuleType("netbox_ceph.services.branch_lifecycle")
+
+    class BranchingUnavailableError(RuntimeError):
+        pass
+
+    setattr(branch_lifecycle, "BranchingUnavailableError", BranchingUnavailableError)
     branch_lifecycle.branching_enabled_settings = lambda: None
     branch_lifecycle.create_and_provision_branch = None
     branch_lifecycle.merge_branch = None
@@ -261,6 +267,41 @@ def test_ceph_sync_job_run_records_successful_stages(
         "ok",
     ]
     assert ceph_sync["response"]["stages"][0]["response"] == _sync_payload("pools")
+
+
+def test_unavailable_branching_stops_before_any_model_write(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    error_message = (
+        "Ceph sync refused: branch isolation is configured, but the runtime is unavailable."
+    )
+    branch_lifecycle = sys.modules["netbox_ceph.services.branch_lifecycle"]
+    model_manager = SimpleNamespace(update_or_create=Mock())
+    reflected_model = SimpleNamespace(save=Mock())
+
+    def unavailable_settings() -> None:
+        raise branch_lifecycle.BranchingUnavailableError(error_message)
+
+    def fake_fetch(resource: str, *, netbox_branch_schema_id: str | None):
+        model_manager.update_or_create(resource=resource)
+        reflected_model.save()
+        return jobs_module.CephSyncResponse(_sync_payload(resource))
+
+    monkeypatch.setattr(jobs_module, "branching_enabled_settings", unavailable_settings)
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", fake_fetch)
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(
+        branch_lifecycle.BranchingUnavailableError,
+        match="runtime is unavailable",
+    ) as exc_info:
+        runner.run(resources=["pools"], cluster_pk=7)
+
+    assert str(exc_info.value) == error_message
+    model_manager.update_or_create.assert_not_called()
+    reflected_model.save.assert_not_called()
+    assert runner.job.saved_data == []
 
 
 def test_ceph_sync_job_run_continues_after_stage_error_then_fails(
@@ -771,9 +812,16 @@ def test_enabled_branching_fails_closed_when_runtime_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
     branch_lifecycle_module,
 ) -> None:
-    monkeypatch.setattr(branch_lifecycle_module, "is_branching_available", lambda: False)
+    monkeypatch.setattr(
+        branch_lifecycle_module,
+        "_proxbox_branch_lifecycle",
+        lambda: SimpleNamespace(is_branching_available=lambda: False),
+    )
 
-    with pytest.raises(RuntimeError, match="refusing to sync against the main schema"):
+    with pytest.raises(
+        branch_lifecycle_module.BranchingUnavailableError,
+        match="runtime is unavailable",
+    ):
         branch_lifecycle_module.branching_enabled_settings()
 
 
@@ -790,7 +838,10 @@ def test_unreadable_branching_setting_fails_closed(
         fail_settings_read,
     )
 
-    with pytest.raises(RuntimeError, match="Could not determine whether"):
+    with pytest.raises(
+        branch_lifecycle_module.BranchingUnavailableError,
+        match="branching_enabled could not be read.*database unavailable",
+    ):
         branch_lifecycle_module.branching_enabled_settings()
 
 

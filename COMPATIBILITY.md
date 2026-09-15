@@ -21,6 +21,13 @@ The shared compatibility module is vendored byte-identically across
 |---|---|---|---|---|
 | v0.0.1.post1 branch | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | Required |
 
+Fail-closed branch isolation is guaranteed on every supported `netbox-proxbox`
+version. The typed branching decision contract is consumed automatically from
+`netbox-proxbox` 0.0.27 onward; on published earlier releases the wrapper falls
+back to `is_branching_available()` and preserves the same fail-closed behavior.
+The dependency floor therefore remains on the published `0.0.25.post2` release
+and does not require 0.0.27.
+
 The legacy 4.5/4.6 cells remain in CI for backward compatibility. The GA cell
 uses the exact NetBox source revision
 `5f06007e4c9bacc93ce17c1e645fc1143d60df3d`, and the Docker smoke matrix uses

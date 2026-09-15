@@ -65,9 +65,13 @@ When `CephPluginSettings.branching_enabled` is `True`, each sync job:
 
 Branching requires the
 [`netbox-branching`](https://github.com/netboxlabs/netbox-branching) plugin to
-be installed and loaded. If `branching_enabled` is true while that runtime is
-unavailable, the sync fails closed before any write rather than falling back to
-the main schema.
+be installed and loaded. This setting establishes a fail-closed isolation
+boundary. Before the first backend call or job-data write, the job reads
+`CephPluginSettings` and confirms a working branching runtime. If the settings
+row cannot be read or `netbox-proxbox` cannot confirm the runtime,
+`BranchingUnavailableError` fails the job with an actionable message. The job
+writes directly to the main schema only when `branching_enabled` is explicitly
+`False`.
 
 ## Dispatching a sync
 
@@ -88,14 +92,20 @@ Authorization: Token <token>
 
 Omit the `resources` key (or pass `["full"]`) to sync all resources.
 
-## Settings reference
+## Settings and configuration reference
 
 Plugin-wide sync settings live in the singleton `CephPluginSettings` model:
 
 | Field | Default | Description |
 |---|---|---|
-| `branching_enabled` | `false` | Enable branch-per-sync isolation via `netbox-branching` |
+| `branching_enabled` | `false` | Require branch-per-sync isolation; the job refuses to run if the branching runtime is unavailable |
 | `branch_name_prefix` | `ceph-sync` | Prefix for auto-created branch names |
 | `branch_on_conflict` | `fail` | What to do when a branch cannot be cleanly merged: `fail` or `acknowledge` |
 
 Edit settings at **Plugins → Ceph → Settings → Edit**.
+
+The wrapper consumes the typed `resolve_branching_decision()` contract from
+`netbox-proxbox` 0.0.27 onward. On every supported earlier version, it uses the
+published `is_branching_available()` helper and enforces the same fail-closed
+rule. This compatibility path does not permit a runtime failure to become an
+unisolated sync.

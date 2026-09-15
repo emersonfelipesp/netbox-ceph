@@ -26,6 +26,17 @@ v1 reflection syncs are dispatched with `POST
 as `["pools", "osds"]`; omit it to run the default `full` sync. Queued runs are
 visible in NetBox's core Jobs UI.
 
+### Branch isolation
+
+When `CephPluginSettings.branching_enabled` is `False`, Ceph sync jobs may write
+directly to the main schema. When it is `True`, every job must resolve a working
+NetBox branching runtime through `netbox-proxbox`, create a branch, run the
+backend sync against the branch schema, and merge it according to the plugin
+settings conflict policy. If the settings row cannot be read or the branching
+runtime is missing, disabled, incompatible, or otherwise unavailable, the job
+fails before the first inventory write. It never silently falls back to direct
+writes on main.
+
 The proxbox-api sync contract returns HTTP 200. The client rejects non-2xx HTTP
 responses and validates every accepted body against proxbox-api's typed Ceph
 sync summary before the stage can succeed. Every summary must name the requested
