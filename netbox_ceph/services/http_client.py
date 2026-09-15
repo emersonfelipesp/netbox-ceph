@@ -7,9 +7,11 @@ plain JSON GETs (see ``proxbox_api/ceph/routes.py``):
 - ``GET /ceph/sync/full``
 - ``GET /ceph/sync/{status,daemons,osds,pools,filesystems,crush,flags,rgw,rbd}``
 
-Every ``/ceph/sync/*`` route accepts an optional ``netbox_branch_schema_id``
-query parameter so the NetBox branching plugin can keep a single
-branch-aware contract when persistence is added.
+Every ``/ceph/sync/*`` route receives exactly one backend
+``proxmox_endpoint_ids`` value. The route's ``ProxmoxSessionsDep`` dependency
+uses that query parameter to prevent a selected cluster sync from fanning out
+across every configured Proxmox session. An optional
+``netbox_branch_schema_id`` keeps the request branch-aware.
 
 This module wraps those calls using the FastAPI endpoint context the
 ``netbox_proxbox`` plugin already resolves via
@@ -148,6 +150,28 @@ class CephSyncSummary:
         }
 
 
+@dataclass(frozen=True)
+class CephBackendContext:
+    """A resolved proxbox-api request context kept stable across one sync run."""
+
+    base_url: str
+    headers: dict[str, str] = field(repr=False)
+    verify_ssl: bool = True
+
+
+@dataclass(frozen=True)
+class CephSyncScope:
+    """The single backend endpoint identity allowed to satisfy a sync stage.
+
+    ``endpoint_name`` is the NetBox-side display name used in refusal messages;
+    proxbox-api does not echo it, so scope binding compares ``endpoint_host`` only.
+    """
+
+    backend_endpoint_id: int
+    endpoint_name: str
+    endpoint_host: str
+
+
 @dataclass
 class CephSyncResponse:
     """Validated mirror of proxbox-api's Ceph sync response envelope."""
@@ -186,16 +210,18 @@ def _request_url(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
-def _resolve_context() -> tuple[str, dict[str, str], bool]:
+def resolve_ceph_backend_context() -> CephBackendContext:
+    """Resolve the proxbox-api context once for endpoint mapping and sync calls."""
+
     context = get_fastapi_request_context()
     if context is None or not context.http_url:
         raise CephBackendError(
             "No FastAPIEndpoint configured; cannot call proxbox-api /ceph/* routes."
         )
-    return (
-        context.http_url,
-        dict(context.headers or {}),
-        bool(context.verify_ssl),
+    return CephBackendContext(
+        base_url=context.http_url,
+        headers=dict(context.headers or {}),
+        verify_ssl=bool(context.verify_ssl),
     )
 
 
@@ -208,16 +234,17 @@ def _get_json(
     path: str,
     *,
     params: dict[str, Any] | None = None,
+    backend_context: CephBackendContext | None = None,
 ) -> dict[str, Any]:
-    base_url, headers, verify_ssl = _resolve_context()
-    url = _request_url(base_url, path)
+    context = backend_context or resolve_ceph_backend_context()
+    url = _request_url(context.base_url, path)
     try:
         response = requests.get(
             url,
-            headers=headers,
+            headers=context.headers,
             params=params,
             timeout=_CEPH_HTTP_TIMEOUT,
-            verify=verify_ssl,
+            verify=context.verify_ssl,
         )
     except requests.RequestException as exc:
         raise CephBackendError(f"Ceph backend request failed: {exc}") from exc
@@ -244,6 +271,10 @@ def _get_json(
     return payload
 
 
+def _normalize_host(value: str | None) -> str:
+    return str(value or "").split("/")[0].strip().rstrip(".").lower()
+
+
 def _validate_resource_binding(response: CephSyncResponse, requested_resource: str) -> None:
     for index, summary in enumerate(response.items):
         if summary.resource != requested_resource:
@@ -254,6 +285,25 @@ def _validate_resource_binding(response: CephSyncResponse, requested_resource: s
             )
 
 
+def _validate_scope_binding(response: CephSyncResponse, scope: CephSyncScope) -> None:
+    if len(response.items) != 1:
+        raise CephSyncPayloadError(
+            "Ceph backend returned malformed sync summary: items must contain "
+            f"exactly one summary for endpoint {scope.endpoint_name!r}; got "
+            f"{len(response.items)}."
+        )
+    # proxbox-api names a session after its domain, IP, cluster, or node — never
+    # after the NetBox-side display name — so ``summary.name`` is reported in the
+    # refusal for operators but only the host proves the endpoint identity.
+    summary = response.items[0]
+    if _normalize_host(summary.host) != _normalize_host(scope.endpoint_host):
+        raise CephSyncPayloadError(
+            "Ceph backend returned malformed sync summary: items[0].host must "
+            f"match requested endpoint host {scope.endpoint_host!r}; got {summary.host!r} "
+            f"(session {summary.name!r}, endpoint {scope.endpoint_name!r})."
+        )
+
+
 def fetch_ceph_status() -> dict[str, Any]:
     """Return the ``/ceph/status`` reachability/health probe."""
     return _get_json("ceph/status")
@@ -262,17 +312,32 @@ def fetch_ceph_status() -> dict[str, Any]:
 def fetch_ceph_sync(
     resource: str,
     *,
+    scope: CephSyncScope,
     netbox_branch_schema_id: str | None = None,
+    backend_context: CephBackendContext | None = None,
 ) -> CephSyncResponse:
     """Call ``/ceph/sync/<resource>`` and return its validated response."""
     if resource not in CEPH_SYNC_RESOURCES:
         raise ValueError(
             f"Unknown Ceph sync resource {resource!r}; expected one of {CEPH_SYNC_RESOURCES}"
         )
-    params: dict[str, Any] = {}
+    if (
+        isinstance(scope.backend_endpoint_id, bool)
+        or not isinstance(scope.backend_endpoint_id, int)
+        or scope.backend_endpoint_id <= 0
+    ):
+        raise ValueError("Ceph sync requires a positive backend Proxmox endpoint id.")
+    params: dict[str, Any] = {
+        "proxmox_endpoint_ids": str(scope.backend_endpoint_id),
+    }
     if netbox_branch_schema_id:
         params["netbox_branch_schema_id"] = netbox_branch_schema_id
-    payload = _get_json(f"ceph/sync/{resource}", params=params or None)
+    payload = _get_json(
+        f"ceph/sync/{resource}",
+        params=params,
+        backend_context=backend_context,
+    )
     response = CephSyncResponse.from_payload(payload)
     _validate_resource_binding(response, resource)
+    _validate_scope_binding(response, scope)
     return response

@@ -41,9 +41,40 @@ calls:
 GET {proxbox-api}/ceph/sync/{resource}
 ```
 
-with an optional `netbox_branch_schema_id` query parameter when branching is
-enabled. The HTTP timeout is `(5.0, 300.0)` seconds (short connect, long read)
-to accommodate fan-out queries on large or degraded clusters.
+with the `proxmox_endpoint_ids` query parameter set to exactly one backend
+Proxmox endpoint id, and an optional `netbox_branch_schema_id` query parameter
+when branching is enabled. The HTTP timeout is `(5.0, 300.0)` seconds (short
+connect, long read) to accommodate slow queries on large or degraded clusters.
+
+### Endpoint scope
+
+proxbox-api's `/ceph/sync/*` routes fan out across every configured Proxmox
+session unless the request names an endpoint. The job therefore binds each run
+to one backend endpoint before its first request:
+
+1. Loads the `CephCluster` named by `cluster_pk` together with its linked
+   `ProxmoxCluster` and that cluster's `ProxmoxEndpoint`. The Ceph cluster's own
+   `endpoint` must be the same endpoint.
+2. Resolves that `ProxmoxEndpoint` to its proxbox-api database id through
+   netbox-proxbox's `resolve_backend_endpoint_id()` helper, using the same
+   request context as the sync calls.
+3. Sends `proxmox_endpoint_ids=<id>` on every `/ceph/sync/<resource>` request
+   and records `proxmox_cluster_pk`, `proxmox_endpoint_pk`, and
+   `backend_endpoint_id` in the job's `params`.
+
+If the cluster does not exist, has no linked Proxmox cluster or endpoint, names
+two different endpoints, or the endpoint is not uniquely registered in
+proxbox-api, the job fails with `CephSyncScopeError` before any branch is
+created or any request is sent, and stores
+`response.reason = "unresolved_cluster_scope"` with the refusal message.
+
+Each accepted response must contain exactly one summary whose `host` matches
+the resolved endpoint's domain or IP address (compared case-insensitively,
+ignoring a trailing dot); anything else — an aggregate for several endpoints,
+a summary for a different endpoint, or an empty list — is rejected as
+`malformed_summary` and the stage fails. The summary's `name` is not compared:
+proxbox-api names a session after its domain, IP, cluster, or node, never after
+the NetBox endpoint name, so the name is only quoted in the refusal message.
 
 Errors from the backend surface as `CephBackendError` and are recorded in the
 job log without aborting the whole run — a failure on one resource does not

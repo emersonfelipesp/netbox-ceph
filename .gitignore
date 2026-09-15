@@ -17,3 +17,4 @@ coverage.xml
 .tox/
 .python-version
 .DS_Store
+.tmp/

@@ -212,15 +212,26 @@ through the v2 orchestrator path must pass through `redact_secrets()`.
 arguments only: `cluster_pk`, `resources`, `queue_name`, `name`, and `user`.
 Do not pass ORM objects through `instance=`. `resources` may be omitted, a
 single resource, a comma-separated string, or a list; the job normalizes,
-deduplicates, and validates it before enqueueing. The proxbox-api sync contract
+deduplicates, and validates it before enqueueing. Before its first request the
+job binds the run to one backend endpoint: `cluster_pk` → `CephCluster` →
+linked `ProxmoxCluster` → `ProxmoxEndpoint` → proxbox-api id through
+`netbox_proxbox.views.backend_sync.resolve_backend_endpoint_id()`. An unknown,
+unlinked, or ambiguous cluster, or an endpoint that proxbox-api cannot resolve
+uniquely, raises `CephSyncScopeError` (`reason="unresolved_cluster_scope"`)
+before any branch or request. Every `/ceph/sync/<resource>` request carries
+`proxmox_endpoint_ids=<backend id>` because the backend otherwise fans out
+across every Proxmox session. The proxbox-api sync contract
 returns HTTP 200; the client rejects every non-2xx response, then validates an
-accepted response as a `CephSyncResponse` containing typed `CephSyncSummary`
-items whose `resource` values must equal the requested resource. Any summary
-error list marks its stage `failed` with
-`reason="upstream_errors"`; an unknown response shape marks it `failed` with
-`reason="malformed_summary"`, as does a non-JSON success body or resource
-mismatch. The job continues later selected resources to
-retain mixed-stage evidence, then fails before merge. An isolation branch stays
+accepted response as a `CephSyncResponse` containing exactly one typed
+`CephSyncSummary` whose `resource` equals the requested resource and whose
+`host` matches the resolved endpoint's domain or IP (proxbox-api names a
+session after its domain, IP, cluster, or node, never the NetBox endpoint
+name, so `name` is never compared). Any summary error list marks its stage
+`failed` with `reason="upstream_errors"`; an unknown response shape marks it
+`failed` with `reason="malformed_summary"`, as does a non-JSON success body, a
+resource mismatch, or a summary outside the requested endpoint scope. The job
+continues later selected resources to retain mixed-stage evidence, then fails
+before merge. An isolation branch stays
 open with `branch_disposition.status="left_open"` and
 `reason="ceph_sync_stage_failed"`. v1 HTTP transport errors store only the
 status/path summary in job data, never raw proxbox-api response bodies.

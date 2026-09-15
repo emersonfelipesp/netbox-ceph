@@ -6,6 +6,7 @@ import importlib.util
 import logging
 import sys
 import types
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -118,15 +119,48 @@ def jobs_module(monkeypatch: pytest.MonkeyPatch):
         def as_payload(self):
             return self._payload
 
+    @dataclass(frozen=True)
+    class CephBackendContext:
+        base_url: str
+        headers: dict[str, str]
+        verify_ssl: bool = True
+
+    @dataclass(frozen=True)
+    class CephSyncScope:
+        backend_endpoint_id: int
+        endpoint_name: str
+        endpoint_host: str
+
     http_client.CephBackendError = CephBackendError
     http_client.CephSyncPayloadError = CephSyncPayloadError
     http_client.CephSyncResponse = CephSyncResponse
+    http_client.CephBackendContext = CephBackendContext
+    http_client.CephSyncScope = CephSyncScope
+    http_client.resolve_ceph_backend_context = lambda: CephBackendContext(
+        base_url="https://backend.example", headers={}
+    )
     http_client.fetch_ceph_sync = lambda resource, **kwargs: CephSyncResponse(
         _sync_payload(resource)
     )
     monkeypatch.setitem(sys.modules, "netbox_ceph.services.http_client", http_client)
 
-    return _load_module("tests._netbox_ceph_jobs_under_test", "netbox_ceph/jobs.py")
+    module = _load_module("tests._netbox_ceph_jobs_under_test", "netbox_ceph/jobs.py")
+    # Scope resolution needs Django models and a live backend; job tests bind the
+    # run to a fixed endpoint unless they exercise the resolver explicitly.
+    module._real_resolve_sync_target = module._resolve_sync_target
+    module._resolve_sync_target = lambda cluster_pk: _resolved_target(module)
+    return module
+
+
+def _resolved_target(jobs_module):
+    return jobs_module._ResolvedSyncTarget(
+        scope=jobs_module.CephSyncScope(7, "Lab (nb:3)", "backend.example"),
+        backend_context=jobs_module.CephBackendContext(
+            base_url="https://backend.example", headers={}
+        ),
+        proxmox_cluster_pk=5,
+        endpoint_pk=3,
+    )
 
 
 def test_normalize_resources_defaults_deduplicates_and_rejects_invalid(jobs_module) -> None:
@@ -248,7 +282,7 @@ def test_ceph_sync_job_run_records_successful_stages(
 ) -> None:
     calls: list[tuple[str, str | None]] = []
 
-    def fake_fetch(resource, *, netbox_branch_schema_id=None):
+    def fake_fetch(resource, *, scope, netbox_branch_schema_id=None, backend_context=None):
         calls.append((resource, netbox_branch_schema_id))
         return jobs_module.CephSyncResponse(_sync_payload(resource))
 
@@ -310,7 +344,7 @@ def test_ceph_sync_job_run_continues_after_stage_error_then_fails(
 ) -> None:
     calls: list[str] = []
 
-    def fake_fetch(resource, *, netbox_branch_schema_id=None):
+    def fake_fetch(resource, *, scope, netbox_branch_schema_id=None, backend_context=None):
         calls.append(resource)
         if resource == "pools":
             raise jobs_module.CephBackendError("backend unavailable")
@@ -337,7 +371,7 @@ def test_ceph_sync_job_run_fails_for_mixed_upstream_summary_errors(
 ) -> None:
     calls: list[str] = []
 
-    def fake_fetch(resource, *, netbox_branch_schema_id=None):
+    def fake_fetch(resource, *, scope, netbox_branch_schema_id=None, backend_context=None):
         calls.append(resource)
         errors = ["RuntimeError: pool query failed"] if resource == "pools" else []
         return jobs_module.CephSyncResponse(_sync_payload(resource, errors=errors))
@@ -423,6 +457,278 @@ def test_ceph_sync_job_malformed_summary_records_named_failure(
     assert stage["error"] == ("Ceph backend returned malformed sync summary: items must be a list.")
 
 
+def test_ceph_sync_job_scopes_every_stage_to_the_resolved_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    calls: list[tuple[str, int, str]] = []
+
+    def fake_fetch(resource, *, scope, netbox_branch_schema_id=None, backend_context=None):
+        calls.append((resource, scope.backend_endpoint_id, backend_context.base_url))
+        return jobs_module.CephSyncResponse(_sync_payload(resource))
+
+    monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", fake_fetch)
+
+    runner = _job_runner(jobs_module)
+    runner.run(resources=["pools", "osds"], cluster_pk=7)
+
+    assert calls == [
+        ("pools", 7, "https://backend.example"),
+        ("osds", 7, "https://backend.example"),
+    ]
+    params = runner.job.data["ceph_sync"]["params"]
+    assert params["proxmox_cluster_pk"] == 5
+    assert params["proxmox_endpoint_pk"] == 3
+    assert params["backend_endpoint_id"] == 7
+
+
+def test_ceph_sync_job_unresolved_scope_fails_before_branch_or_request(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    events: list[str] = []
+
+    def refuse(cluster_pk):
+        raise jobs_module.CephSyncScopeError(
+            f"Ceph sync refused: no CephCluster exists for cluster_pk={cluster_pk!r}."
+        )
+
+    monkeypatch.setattr(jobs_module, "_resolve_sync_target", refuse)
+    monkeypatch.setattr(
+        jobs_module, "branching_enabled_settings", lambda: events.append("branching")
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "create_and_provision_branch",
+        lambda **kwargs: events.append("branch"),
+    )
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", lambda *a, **k: events.append("fetch"))
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(jobs_module.CephSyncScopeError, match="cluster_pk=404"):
+        runner.run(resources=["pools"], cluster_pk=404)
+
+    assert events == []
+    ceph_sync = runner.job.data["ceph_sync"]
+    assert ceph_sync["params"] == {"resources": ["pools"], "cluster_pk": 404}
+    assert ceph_sync["response"]["status"] == "failed"
+    assert ceph_sync["response"]["reason"] == "unresolved_cluster_scope"
+    assert "cluster_pk=404" in ceph_sync["response"]["error"]
+
+
+def _install_cluster_model(monkeypatch: pytest.MonkeyPatch, cluster: object | None):
+    models = types.ModuleType("netbox_ceph.models")
+
+    class DoesNotExist(Exception):
+        pass
+
+    class _Query:
+        def select_related(self, *fields):
+            return self
+
+        def get(self, *, pk):
+            if cluster is None or getattr(cluster, "pk", None) != pk:
+                raise DoesNotExist()
+            return cluster
+
+    class CephCluster:
+        objects = _Query()
+
+    CephCluster.DoesNotExist = DoesNotExist
+    models.CephCluster = CephCluster
+    monkeypatch.setitem(sys.modules, "netbox_ceph.models", models)
+
+
+def _endpoint(pk: int = 3, *, name: str = "Lab", domain: str = "pve-a.example"):
+    return SimpleNamespace(pk=pk, name=name, domain=domain, ip_address=None)
+
+
+def _install_backend_sync(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    resolver=None,
+    name_builder=None,
+    module: bool = True,
+):
+    if not module:
+        monkeypatch.setitem(sys.modules, "netbox_proxbox.views.backend_sync", None)
+        return
+    backend_sync = types.ModuleType("netbox_proxbox.views.backend_sync")
+    if resolver is not None:
+        backend_sync.resolve_backend_endpoint_id = resolver
+    if name_builder is not None:
+        backend_sync.proxmox_backend_name = name_builder
+    netbox_proxbox = types.ModuleType("netbox_proxbox")
+    netbox_proxbox.__path__ = []
+    views = types.ModuleType("netbox_proxbox.views")
+    views.__path__ = []
+    views.backend_sync = backend_sync
+    monkeypatch.setitem(sys.modules, "netbox_proxbox", netbox_proxbox)
+    monkeypatch.setitem(sys.modules, "netbox_proxbox.views", views)
+    monkeypatch.setitem(sys.modules, "netbox_proxbox.views.backend_sync", backend_sync)
+
+
+def test_resolve_sync_target_binds_cluster_to_one_backend_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    endpoint = _endpoint()
+    cluster = SimpleNamespace(
+        pk=11, endpoint=endpoint, proxmox_cluster=SimpleNamespace(pk=5, endpoint=endpoint)
+    )
+    _install_cluster_model(monkeypatch, cluster)
+    resolver_calls: list[dict[str, object]] = []
+
+    def resolver(candidate, *, base_url, auth_headers, backend_verify_ssl):
+        resolver_calls.append(
+            {
+                "endpoint": candidate,
+                "base_url": base_url,
+                "auth_headers": auth_headers,
+                "backend_verify_ssl": backend_verify_ssl,
+            }
+        )
+        return 42, None
+
+    _install_backend_sync(
+        monkeypatch,
+        resolver=resolver,
+        name_builder=lambda candidate: f"{candidate.name} (nb:{candidate.pk})",
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "resolve_ceph_backend_context",
+        lambda: jobs_module.CephBackendContext(
+            base_url="https://backend.example/", headers={"Authorization": "x"}, verify_ssl=False
+        ),
+    )
+
+    target = jobs_module._real_resolve_sync_target(11)
+
+    assert target.scope == jobs_module.CephSyncScope(42, "Lab (nb:3)", "pve-a.example")
+    assert target.proxmox_cluster_pk == 5
+    assert target.endpoint_pk == 3
+    assert resolver_calls == [
+        {
+            "endpoint": endpoint,
+            "base_url": "https://backend.example",
+            "auth_headers": {"Authorization": "x"},
+            "backend_verify_ssl": False,
+        }
+    ]
+
+
+def _mismatched_cluster():
+    return SimpleNamespace(
+        pk=11,
+        endpoint=_endpoint(pk=3),
+        proxmox_cluster=SimpleNamespace(pk=5, endpoint=_endpoint(pk=4)),
+    )
+
+
+def _unlinked_cluster():
+    return SimpleNamespace(pk=11, endpoint=_endpoint(), proxmox_cluster=None)
+
+
+@pytest.mark.parametrize(
+    ("cluster_pk", "cluster", "expected"),
+    [
+        (None, None, "cluster_pk is required"),
+        (11, None, "no CephCluster exists for cluster_pk=11"),
+        (11, _unlinked_cluster(), "no linked ProxmoxCluster endpoint"),
+        (11, _mismatched_cluster(), "name different Proxmox endpoints"),
+    ],
+    ids=["missing-pk", "unknown-cluster", "unlinked", "endpoint-mismatch"],
+)
+def test_resolve_sync_target_refuses_before_any_backend_call(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+    cluster_pk: object,
+    cluster: object,
+    expected: str,
+) -> None:
+    _install_cluster_model(monkeypatch, cluster)
+    context_calls: list[str] = []
+    monkeypatch.setattr(
+        jobs_module, "resolve_ceph_backend_context", lambda: context_calls.append("context")
+    )
+    _install_backend_sync(monkeypatch, resolver=lambda *a, **k: context_calls.append("resolve"))
+
+    with pytest.raises(jobs_module.CephSyncScopeError, match=expected) as excinfo:
+        jobs_module._real_resolve_sync_target(cluster_pk)
+
+    assert excinfo.value.reason == "unresolved_cluster_scope"
+    assert context_calls == []
+
+
+@pytest.mark.parametrize(
+    ("resolver", "name_builder", "module", "expected"),
+    [
+        (None, None, False, "does not expose backend endpoint scope helpers"),
+        (None, lambda e: "Lab", True, "typed backend endpoint scope contract"),
+        (lambda *a, **k: (None, "ambiguous"), lambda e: "Lab", True, "not uniquely registered"),
+        (lambda *a, **k: (None, None), lambda e: "Lab", True, "not uniquely registered"),
+        (lambda *a, **k: (True, None), lambda e: "Lab", True, "not uniquely registered"),
+        (lambda *a, **k: (0, None), lambda e: "Lab", True, "invalid backend endpoint id"),
+        (
+            lambda *a, **k: (_ for _ in ()).throw(OSError("down")),
+            lambda e: "Lab",
+            True,
+            "could not be resolved",
+        ),
+    ],
+    ids=["no-module", "no-resolver", "error", "none-id", "bool-id", "zero-id", "raises"],
+)
+def test_resolve_sync_target_refuses_unresolved_backend_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+    resolver,
+    name_builder,
+    module: bool,
+    expected: str,
+) -> None:
+    endpoint = _endpoint()
+    cluster = SimpleNamespace(
+        pk=11, endpoint=endpoint, proxmox_cluster=SimpleNamespace(pk=5, endpoint=endpoint)
+    )
+    _install_cluster_model(monkeypatch, cluster)
+    _install_backend_sync(monkeypatch, resolver=resolver, name_builder=name_builder, module=module)
+    monkeypatch.setattr(
+        jobs_module,
+        "resolve_ceph_backend_context",
+        lambda: jobs_module.CephBackendContext(base_url="https://backend.example", headers={}),
+    )
+
+    with pytest.raises(jobs_module.CephSyncScopeError, match=expected):
+        jobs_module._real_resolve_sync_target(11)
+
+
+def test_resolve_sync_target_uses_ip_address_when_endpoint_has_no_domain(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    endpoint = SimpleNamespace(
+        pk=3, name="Lab", domain="", ip_address=SimpleNamespace(address="192.0.2.10/24")
+    )
+    cluster = SimpleNamespace(
+        pk=11, endpoint=endpoint, proxmox_cluster=SimpleNamespace(pk=5, endpoint=endpoint)
+    )
+    _install_cluster_model(monkeypatch, cluster)
+    _install_backend_sync(
+        monkeypatch, resolver=lambda *a, **k: (9, None), name_builder=lambda e: "Lab (nb:3)"
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "resolve_ceph_backend_context",
+        lambda: jobs_module.CephBackendContext(base_url="https://backend.example", headers={}),
+    )
+
+    target = jobs_module._real_resolve_sync_target(11)
+
+    assert target.scope.endpoint_host == "192.0.2.10"
+
+
 def test_ceph_sync_job_run_creates_branch_and_reports_merge_conflict(
     monkeypatch: pytest.MonkeyPatch,
     jobs_module,
@@ -442,7 +748,7 @@ def test_ceph_sync_job_run_creates_branch_and_reports_merge_conflict(
         lambda *, name, user: branch,
     )
 
-    def fake_fetch(resource, *, netbox_branch_schema_id=None):
+    def fake_fetch(resource, *, scope, netbox_branch_schema_id=None, backend_context=None):
         fetch_calls.append((resource, netbox_branch_schema_id))
         return jobs_module.CephSyncResponse(_sync_payload(resource))
 
@@ -459,6 +765,18 @@ def test_ceph_sync_job_run_creates_branch_and_reports_merge_conflict(
 
     assert fetch_calls == [("pools", "schema-101")]
     assert merge_calls == [(branch, runner.job.user, "fail")]
+
+
+def _scope(http_client_module, **overrides):
+    # endpoint_name carries the NetBox display name exactly as netbox-proxbox's
+    # proxmox_backend_name() builds it; proxbox-api never echoes it back.
+    values = {
+        "backend_endpoint_id": 7,
+        "endpoint_name": "Lab (nb:3)",
+        "endpoint_host": "pve-a.example",
+    }
+    values.update(overrides)
+    return http_client_module.CephSyncScope(**values)
 
 
 @pytest.fixture
@@ -569,25 +887,48 @@ def test_fetch_ceph_sync_validates_resource_and_passes_branch_param(
 ) -> None:
     captured: dict[str, object] = {}
 
-    def fake_get_json(path, *, params=None):
+    def fake_get_json(path, *, params=None, backend_context=None):
         captured["path"] = path
         captured["params"] = params
+        captured["backend_context"] = backend_context
         return _sync_payload("pools")
 
     monkeypatch.setattr(http_client_module, "_get_json", fake_get_json)
+    context = http_client_module.CephBackendContext(base_url="https://backend.example", headers={})
 
     response = http_client_module.fetch_ceph_sync(
         "pools",
+        scope=_scope(http_client_module),
         netbox_branch_schema_id="branch-1",
+        backend_context=context,
     )
     assert response.as_payload() == _sync_payload("pools")
     assert captured == {
         "path": "ceph/sync/pools",
-        "params": {"netbox_branch_schema_id": "branch-1"},
+        "params": {"proxmox_endpoint_ids": "7", "netbox_branch_schema_id": "branch-1"},
+        "backend_context": context,
     }
 
     with pytest.raises(ValueError, match="Unknown Ceph sync resource"):
-        http_client_module.fetch_ceph_sync("bad-resource")
+        http_client_module.fetch_ceph_sync("bad-resource", scope=_scope(http_client_module))
+
+
+@pytest.mark.parametrize("backend_endpoint_id", [0, -1, True, "7"])
+def test_fetch_ceph_sync_refuses_unscoped_request(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+    backend_endpoint_id: object,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(http_client_module, "_get_json", lambda path, **kwargs: calls.append(path))
+
+    with pytest.raises(ValueError, match="positive backend Proxmox endpoint id"):
+        http_client_module.fetch_ceph_sync(
+            "pools",
+            scope=_scope(http_client_module, backend_endpoint_id=backend_endpoint_id),
+        )
+
+    assert calls == []
 
 
 def test_fetch_ceph_sync_returns_typed_summaries_and_collects_errors(
@@ -596,20 +937,87 @@ def test_fetch_ceph_sync_returns_typed_summaries_and_collects_errors(
 ) -> None:
     payload = {
         "items": [
-            _summary_payload("pools", errors=["OSError: pve-a failed"], name="pve-a"),
-            _summary_payload("pools", errors=["TimeoutError: pve-b failed"], name="pve-b"),
+            _summary_payload(
+                "pools",
+                errors=["OSError: pve-a failed", "TimeoutError: pve-a mon down"],
+                name="pve-a",
+            ),
         ],
         "raw": {"resource": "pools"},
     }
     monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
 
-    response = http_client_module.fetch_ceph_sync("pools")
+    response = http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
 
     assert all(
         isinstance(summary, http_client_module.CephSyncSummary) for summary in response.items
     )
-    assert response.errors == ["OSError: pve-a failed", "TimeoutError: pve-b failed"]
+    assert response.errors == ["OSError: pve-a failed", "TimeoutError: pve-a mon down"]
     assert response.as_payload() == payload
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    [
+        (
+            [_summary_payload("pools", name="pve-a"), _summary_payload("pools", name="pve-b")],
+            "items must contain exactly one summary for endpoint 'Lab (nb:3)'; got 2",
+        ),
+        (
+            [{**_summary_payload("pools", name="pve-b"), "host": "pve-b.example"}],
+            "items[0].host must match requested endpoint host 'pve-a.example'; got 'pve-b.example' "
+            "(session 'pve-b', endpoint 'Lab (nb:3)')",
+        ),
+        ([], "items must contain exactly one summary for endpoint 'Lab (nb:3)'; got 0"),
+    ],
+    ids=["fan-out", "other-endpoint", "empty"],
+)
+def test_fetch_ceph_sync_rejects_summary_outside_requested_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+    items: list[object],
+    expected: str,
+) -> None:
+    payload = {"items": items, "raw": None}
+    monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
+
+    with pytest.raises(http_client_module.CephSyncPayloadError) as excinfo:
+        http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
+
+    assert excinfo.value.reason == "malformed_summary"
+    assert expected in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "session_name",
+    ["pve-a.example", "lab-cluster", "pve-a", "192.0.2.10"],
+    ids=["domain", "cluster-name", "node-name", "ip"],
+)
+def test_fetch_ceph_sync_accepts_backend_session_names_that_differ_from_netbox(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+    session_name: str,
+) -> None:
+    """proxbox-api names sessions after domain/IP/cluster/node, never the NetBox name."""
+
+    payload = {"items": [_summary_payload("pools", name=session_name)], "raw": None}
+    monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
+
+    response = http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
+
+    assert response.items[0].name == session_name
+
+
+def test_fetch_ceph_sync_scope_host_match_ignores_case_and_trailing_dot(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+) -> None:
+    payload = {"items": [{**_summary_payload("pools"), "host": "PVE-A.example."}], "raw": None}
+    monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
+
+    response = http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
+
+    assert response.items[0].host == "PVE-A.example."
 
 
 def test_fetch_ceph_sync_rejects_summary_for_another_resource(
@@ -630,7 +1038,7 @@ def test_fetch_ceph_sync_rejects_summary_for_another_resource(
     )
 
     with pytest.raises(http_client_module.CephSyncPayloadError) as excinfo:
-        http_client_module.fetch_ceph_sync("pools")
+        http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
 
     assert excinfo.value.reason == "malformed_summary"
     assert "items[1].resource must match requested resource 'pools'; got 'osds'" in str(
@@ -750,7 +1158,7 @@ def test_fetch_ceph_sync_rejects_malformed_summary_shape(
     monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
 
     with pytest.raises(http_client_module.CephSyncPayloadError) as excinfo:
-        http_client_module.fetch_ceph_sync("pools")
+        http_client_module.fetch_ceph_sync("pools", scope=_scope(http_client_module))
 
     assert excinfo.value.reason == "malformed_summary"
     assert field in str(excinfo.value)
