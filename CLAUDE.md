@@ -200,7 +200,17 @@ through the v2 orchestrator path must pass through `redact_secrets()`.
 arguments only: `cluster_pk`, `resources`, `queue_name`, `name`, and `user`.
 Do not pass ORM objects through `instance=`. `resources` may be omitted, a
 single resource, a comma-separated string, or a list; the job normalizes,
-deduplicates, and validates it before enqueueing. v1 HTTP errors store only the
+deduplicates, and validates it before enqueueing. The proxbox-api sync contract
+returns HTTP 200; the client rejects every non-2xx response, then validates an
+accepted response as a `CephSyncResponse` containing typed `CephSyncSummary`
+items whose `resource` values must equal the requested resource. Any summary
+error list marks its stage `failed` with
+`reason="upstream_errors"`; an unknown response shape marks it `failed` with
+`reason="malformed_summary"`, as does a non-JSON success body or resource
+mismatch. The job continues later selected resources to
+retain mixed-stage evidence, then fails before merge. An isolation branch stays
+open with `branch_disposition.status="left_open"` and
+`reason="ceph_sync_stage_failed"`. v1 HTTP transport errors store only the
 status/path summary in job data, never raw proxbox-api response bodies.
 
 ## Orchestrator Feature Detection

@@ -37,6 +37,8 @@ from netbox_ceph.services.branch_lifecycle import (
 from netbox_ceph.services.http_client import (
     CEPH_SYNC_RESOURCES,
     CephBackendError,
+    CephSyncPayloadError,
+    CephSyncResponse,
     fetch_ceph_sync,
 )
 
@@ -49,6 +51,8 @@ CEPH_SYNC_QUEUE_NAME = RQ_QUEUE_DEFAULT
 CEPH_SYNC_JOB_TIMEOUT = 7200
 
 DEFAULT_SYNC_RESOURCES: tuple[str, ...] = ("full",)
+
+_BRANCH_SYNC_FAILURE_REASON = "ceph_sync_stage_failed"
 
 
 def _resource_values(resources: object) -> list[object]:
@@ -78,6 +82,78 @@ def _normalize_resources(resources: object = None) -> list[str]:
             if value not in normalized:
                 normalized.append(value)
     return normalized or list(DEFAULT_SYNC_RESOURCES)
+
+
+def _stage_runtime(stage_started: float) -> float:
+    return round(time.monotonic() - stage_started, 3)
+
+
+def _response_stage(
+    resource: str,
+    response: CephSyncResponse,
+    stage_started: float,
+) -> tuple[dict[str, Any], bool]:
+    errors = response.errors
+    stage: dict[str, Any] = {
+        "resource": resource,
+        "status": "failed" if errors else "ok",
+        "runtime_seconds": _stage_runtime(stage_started),
+        "response": response.as_payload(),
+    }
+    if errors:
+        stage.update({"reason": "upstream_errors", "errors": errors})
+    return stage, bool(errors)
+
+
+def _exception_reason(exc: Exception) -> str:
+    if isinstance(exc, CephSyncPayloadError):
+        return exc.reason
+    if isinstance(exc, CephBackendError):
+        return "backend_error"
+    return "invalid_request"
+
+
+def _exception_stage(resource: str, exc: Exception, stage_started: float) -> dict[str, Any]:
+    return {
+        "resource": resource,
+        "status": "failed",
+        "reason": _exception_reason(exc),
+        "runtime_seconds": _stage_runtime(stage_started),
+        "error": str(exc),
+    }
+
+
+def _run_stage(
+    resource: str,
+    netbox_branch_schema_id: str | None,
+    stage_started: float,
+    stage_logger: Any,
+) -> tuple[dict[str, Any], bool]:
+    try:
+        response = fetch_ceph_sync(
+            resource,
+            netbox_branch_schema_id=netbox_branch_schema_id,
+        )
+    except (CephBackendError, ValueError) as exc:
+        stage_logger.error("Ceph sync resource %s failed: %s", resource, exc)
+        return _exception_stage(resource, exc, stage_started), True
+
+    stage, stage_failed = _response_stage(resource, response, stage_started)
+    if stage_failed:
+        stage_logger.error(
+            "Ceph sync resource %s reported upstream errors: %s",
+            resource,
+            "; ".join(response.errors),
+        )
+    return stage, stage_failed
+
+
+def _branch_failure_disposition(branch: object) -> dict[str, str]:
+    return {
+        "status": "left_open",
+        "branch_name": str(getattr(branch, "name", "<unknown>")),
+        "reason": _BRANCH_SYNC_FAILURE_REASON,
+    }
 
 
 class CephSyncJob(JobRunner):
@@ -164,37 +240,24 @@ class CephSyncJob(JobRunner):
         for resource in normalized_resources:
             stage_started = time.monotonic()
             self.logger.info("Calling proxbox-api /ceph/sync/%s", resource)
-            try:
-                payload = fetch_ceph_sync(
-                    resource,
-                    netbox_branch_schema_id=netbox_branch_schema_id,
-                )
-                stage_results.append(
-                    {
-                        "resource": resource,
-                        "status": "ok",
-                        "runtime_seconds": round(time.monotonic() - stage_started, 3),
-                        "response": payload,
-                    }
-                )
-            except (CephBackendError, ValueError) as exc:
-                had_error = True
-                self.logger.error("Ceph sync resource %s failed: %s", resource, exc)
-                stage_results.append(
-                    {
-                        "resource": resource,
-                        "status": "error",
-                        "runtime_seconds": round(time.monotonic() - stage_started, 3),
-                        "error": str(exc),
-                    }
-                )
+            stage, stage_failed = _run_stage(
+                resource,
+                netbox_branch_schema_id,
+                stage_started,
+                self.logger,
+            )
+            stage_results.append(stage)
+            had_error = had_error or stage_failed
 
         runtime_seconds = round(time.monotonic() - run_started, 3)
+        response_data: dict[str, Any] = {"stages": stage_results}
+        if had_error and branch is not None:
+            response_data["branch_disposition"] = _branch_failure_disposition(branch)
         self.job.data = {
             "ceph_sync": {
                 "params": params,
                 "runtime_seconds": runtime_seconds,
-                "response": {"stages": stage_results},
+                "response": response_data,
             }
         }
         self.job.save(update_fields=["data"])

@@ -14,12 +14,46 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _summary_payload(
+    resource: str,
+    *,
+    errors: list[str] | None = None,
+    name: str = "pve-a",
+) -> dict[str, object]:
+    return {
+        "name": name,
+        "host": "pve-a.example",
+        "resource": resource,
+        "fetched": 3,
+        "written": 2,
+        "errors": list(errors or []),
+        "nodes": ["pve-a"],
+        "netbox_branch_schema_id": None,
+    }
+
+
+def _sync_payload(
+    resource: str,
+    *,
+    errors: list[str] | None = None,
+) -> dict[str, object]:
+    return {"items": [_summary_payload(resource, errors=errors)], "raw": None}
+
+
 def _load_module(module_name: str, relative_path: str):
     spec = importlib.util.spec_from_file_location(module_name, ROOT / relative_path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    previous = sys.modules.get(module_name)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
     return module
 
 
@@ -67,8 +101,23 @@ def jobs_module(monkeypatch: pytest.MonkeyPatch):
     class CephBackendError(RuntimeError):
         pass
 
+    class CephSyncPayloadError(CephBackendError):
+        reason = "malformed_summary"
+
+    class CephSyncResponse:
+        def __init__(self, payload):
+            self._payload = payload
+            self.errors = [error for item in payload["items"] for error in item.get("errors", [])]
+
+        def as_payload(self):
+            return self._payload
+
     http_client.CephBackendError = CephBackendError
-    http_client.fetch_ceph_sync = lambda *args, **kwargs: {}
+    http_client.CephSyncPayloadError = CephSyncPayloadError
+    http_client.CephSyncResponse = CephSyncResponse
+    http_client.fetch_ceph_sync = lambda resource, **kwargs: CephSyncResponse(
+        _sync_payload(resource)
+    )
     monkeypatch.setitem(sys.modules, "netbox_ceph.services.http_client", http_client)
 
     return _load_module("tests._netbox_ceph_jobs_under_test", "netbox_ceph/jobs.py")
@@ -141,13 +190,50 @@ def test_ceph_sync_job_enqueue_uses_keyword_args_and_persists_params(
 def _job_runner(jobs_module):
     runner = jobs_module.CephSyncJob()
     runner.logger = logging.getLogger("test_ceph_sync_job")
-    runner.job = SimpleNamespace(
+    job = SimpleNamespace(
         pk=101,
         user=SimpleNamespace(username="operator"),
         data=None,
-        save=lambda update_fields=None: None,
+        saved_data=[],
     )
+    job.save = lambda update_fields=None: job.saved_data.append(job.data)
+    runner.job = job
     return runner
+
+
+def _wire_http_client_to_job(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+    http_client_module,
+) -> None:
+    monkeypatch.setattr(jobs_module, "CephBackendError", http_client_module.CephBackendError)
+    monkeypatch.setattr(
+        jobs_module,
+        "CephSyncPayloadError",
+        http_client_module.CephSyncPayloadError,
+    )
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", http_client_module.fetch_ceph_sync)
+
+
+def _configure_isolated_job(monkeypatch: pytest.MonkeyPatch, jobs_module):
+    branch = SimpleNamespace(name="ceph-sync-101", schema_id="schema-101")
+    merge_calls: list[object] = []
+    monkeypatch.setattr(
+        jobs_module,
+        "branching_enabled_settings",
+        lambda: {"prefix": "ceph-sync", "on_conflict": "fail"},
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "create_and_provision_branch",
+        lambda *, name, user: branch,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "merge_branch",
+        lambda **kwargs: merge_calls.append(kwargs),
+    )
+    return branch, merge_calls
 
 
 def test_ceph_sync_job_run_records_successful_stages(
@@ -158,7 +244,7 @@ def test_ceph_sync_job_run_records_successful_stages(
 
     def fake_fetch(resource, *, netbox_branch_schema_id=None):
         calls.append((resource, netbox_branch_schema_id))
-        return {"resource": resource, "ok": True}
+        return jobs_module.CephSyncResponse(_sync_payload(resource))
 
     monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
     monkeypatch.setattr(jobs_module, "fetch_ceph_sync", fake_fetch)
@@ -174,6 +260,7 @@ def test_ceph_sync_job_run_records_successful_stages(
         "ok",
         "ok",
     ]
+    assert ceph_sync["response"]["stages"][0]["response"] == _sync_payload("pools")
 
 
 def test_ceph_sync_job_run_continues_after_stage_error_then_fails(
@@ -186,7 +273,7 @@ def test_ceph_sync_job_run_continues_after_stage_error_then_fails(
         calls.append(resource)
         if resource == "pools":
             raise jobs_module.CephBackendError("backend unavailable")
-        return {"resource": resource, "ok": True}
+        return jobs_module.CephSyncResponse(_sync_payload(resource))
 
     monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
     monkeypatch.setattr(jobs_module, "fetch_ceph_sync", fake_fetch)
@@ -197,9 +284,102 @@ def test_ceph_sync_job_run_continues_after_stage_error_then_fails(
 
     assert calls == ["pools", "osds"]
     stages = runner.job.data["ceph_sync"]["response"]["stages"]
-    assert stages[0]["status"] == "error"
+    assert stages[0]["status"] == "failed"
+    assert stages[0]["reason"] == "backend_error"
     assert stages[0]["error"] == "backend unavailable"
     assert stages[1]["status"] == "ok"
+
+
+def test_ceph_sync_job_run_fails_for_mixed_upstream_summary_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    calls: list[str] = []
+
+    def fake_fetch(resource, *, netbox_branch_schema_id=None):
+        calls.append(resource)
+        errors = ["RuntimeError: pool query failed"] if resource == "pools" else []
+        return jobs_module.CephSyncResponse(_sync_payload(resource, errors=errors))
+
+    monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", fake_fetch)
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(RuntimeError, match="One or more Ceph sync stages failed"):
+        runner.run(resources=["pools", "osds"], cluster_pk=7)
+
+    assert calls == ["pools", "osds"]
+    stages = runner.job.data["ceph_sync"]["response"]["stages"]
+    assert [stage["status"] for stage in stages] == ["failed", "ok"]
+    assert stages[0]["reason"] == "upstream_errors"
+    assert stages[0]["errors"] == ["RuntimeError: pool query failed"]
+
+
+def test_ceph_sync_job_summary_errors_skip_merge_and_name_open_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    branch = SimpleNamespace(name="ceph-sync-101", schema_id="schema-101")
+    merge_calls: list[object] = []
+
+    monkeypatch.setattr(
+        jobs_module,
+        "branching_enabled_settings",
+        lambda: {"prefix": "ceph-sync", "on_conflict": "fail"},
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "create_and_provision_branch",
+        lambda *, name, user: branch,
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "fetch_ceph_sync",
+        lambda resource, **kwargs: jobs_module.CephSyncResponse(
+            _sync_payload(resource, errors=["OSError: upstream read failed"])
+        ),
+    )
+    monkeypatch.setattr(
+        jobs_module,
+        "merge_branch",
+        lambda **kwargs: merge_calls.append(kwargs),
+    )
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(RuntimeError, match="One or more Ceph sync stages failed"):
+        runner.run(resources=["pools"], cluster_pk=7)
+
+    response = runner.job.data["ceph_sync"]["response"]
+    assert response["stages"][0]["status"] == "failed"
+    assert response["stages"][0]["errors"] == ["OSError: upstream read failed"]
+    assert response["branch_disposition"] == {
+        "status": "left_open",
+        "branch_name": "ceph-sync-101",
+        "reason": "ceph_sync_stage_failed",
+    }
+    assert merge_calls == []
+
+
+def test_ceph_sync_job_malformed_summary_records_named_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+) -> None:
+    def malformed(*args, **kwargs):
+        raise jobs_module.CephSyncPayloadError(
+            "Ceph backend returned malformed sync summary: items must be a list."
+        )
+
+    monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
+    monkeypatch.setattr(jobs_module, "fetch_ceph_sync", malformed)
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(RuntimeError, match="One or more Ceph sync stages failed"):
+        runner.run(resources=["pools"], cluster_pk=7)
+
+    stage = runner.job.data["ceph_sync"]["response"]["stages"][0]
+    assert stage["status"] == "failed"
+    assert stage["reason"] == "malformed_summary"
+    assert stage["error"] == ("Ceph backend returned malformed sync summary: items must be a list.")
 
 
 def test_ceph_sync_job_run_creates_branch_and_reports_merge_conflict(
@@ -223,7 +403,7 @@ def test_ceph_sync_job_run_creates_branch_and_reports_merge_conflict(
 
     def fake_fetch(resource, *, netbox_branch_schema_id=None):
         fetch_calls.append((resource, netbox_branch_schema_id))
-        return {"ok": True}
+        return jobs_module.CephSyncResponse(_sync_payload(resource))
 
     def fake_merge_branch(*, branch, user, on_conflict):
         merge_calls.append((branch, user, on_conflict))
@@ -276,15 +456,18 @@ class _Response:
         return self._payload
 
 
-def test_get_json_strips_raw_error_body(
+@pytest.mark.parametrize("status_code", [302, 500])
+def test_get_json_rejects_non_2xx_without_raw_error_body(
     monkeypatch: pytest.MonkeyPatch,
     http_client_module,
+    status_code: int,
 ) -> None:
     monkeypatch.setattr(
         http_client_module.requests,
         "get",
         lambda *args, **kwargs: _Response(
-            500,
+            status_code,
+            payload=_sync_payload("full"),
             text="traceback with admin_key = super-secret",
         ),
     )
@@ -293,7 +476,8 @@ def test_get_json_strips_raw_error_body(
         http_client_module._get_json("ceph/sync/full")
 
     message = str(excinfo.value)
-    assert message == "Ceph backend returned HTTP 500 for ceph/sync/full."
+    assert type(excinfo.value) is http_client_module.CephBackendError
+    assert message == f"Ceph backend returned HTTP {status_code} for ceph/sync/full."
     assert "super-secret" not in message
     assert "traceback" not in message
 
@@ -314,16 +498,28 @@ def test_get_json_maps_request_failure_non_json_and_bad_shape(
         "get",
         lambda *args, **kwargs: _Response(200, payload=ValueError("not json")),
     )
-    with pytest.raises(http_client_module.CephBackendError, match="non-JSON body"):
+    with pytest.raises(
+        http_client_module.CephSyncPayloadError,
+        match="non-JSON body",
+    ) as excinfo:
         http_client_module._get_json("ceph/sync/full")
+    assert excinfo.value.reason == "malformed_summary"
+
+    with pytest.raises(http_client_module.CephBackendError, match="non-JSON body") as excinfo:
+        http_client_module._get_json("ceph/status")
+    assert type(excinfo.value) is http_client_module.CephBackendError
 
     monkeypatch.setattr(
         http_client_module.requests,
         "get",
         lambda *args, **kwargs: _Response(200, payload=["not", "an", "object"]),
     )
-    with pytest.raises(http_client_module.CephBackendError, match="unexpected payload shape"):
+    with pytest.raises(
+        http_client_module.CephSyncPayloadError,
+        match="unexpected payload shape",
+    ) as excinfo:
         http_client_module._get_json("ceph/sync/full")
+    assert excinfo.value.reason == "malformed_summary"
 
 
 def test_fetch_ceph_sync_validates_resource_and_passes_branch_param(
@@ -335,14 +531,15 @@ def test_fetch_ceph_sync_validates_resource_and_passes_branch_param(
     def fake_get_json(path, *, params=None):
         captured["path"] = path
         captured["params"] = params
-        return {"ok": True}
+        return _sync_payload("pools")
 
     monkeypatch.setattr(http_client_module, "_get_json", fake_get_json)
 
-    assert http_client_module.fetch_ceph_sync(
+    response = http_client_module.fetch_ceph_sync(
         "pools",
         netbox_branch_schema_id="branch-1",
-    ) == {"ok": True}
+    )
+    assert response.as_payload() == _sync_payload("pools")
     assert captured == {
         "path": "ceph/sync/pools",
         "params": {"netbox_branch_schema_id": "branch-1"},
@@ -350,6 +547,172 @@ def test_fetch_ceph_sync_validates_resource_and_passes_branch_param(
 
     with pytest.raises(ValueError, match="Unknown Ceph sync resource"):
         http_client_module.fetch_ceph_sync("bad-resource")
+
+
+def test_fetch_ceph_sync_returns_typed_summaries_and_collects_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+) -> None:
+    payload = {
+        "items": [
+            _summary_payload("pools", errors=["OSError: pve-a failed"], name="pve-a"),
+            _summary_payload("pools", errors=["TimeoutError: pve-b failed"], name="pve-b"),
+        ],
+        "raw": {"resource": "pools"},
+    }
+    monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
+
+    response = http_client_module.fetch_ceph_sync("pools")
+
+    assert all(
+        isinstance(summary, http_client_module.CephSyncSummary) for summary in response.items
+    )
+    assert response.errors == ["OSError: pve-a failed", "TimeoutError: pve-b failed"]
+    assert response.as_payload() == payload
+
+
+def test_fetch_ceph_sync_rejects_summary_for_another_resource(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+) -> None:
+    payload = {
+        "items": [
+            _summary_payload("pools", name="pve-a"),
+            _summary_payload("osds", name="pve-b"),
+        ],
+        "raw": None,
+    }
+    monkeypatch.setattr(
+        http_client_module,
+        "_get_json",
+        lambda *args, **kwargs: payload,
+    )
+
+    with pytest.raises(http_client_module.CephSyncPayloadError) as excinfo:
+        http_client_module.fetch_ceph_sync("pools")
+
+    assert excinfo.value.reason == "malformed_summary"
+    assert "items[1].resource must match requested resource 'pools'; got 'osds'" in str(
+        excinfo.value
+    )
+
+
+@pytest.mark.parametrize(
+    ("response", "expected_reason", "error_fragment"),
+    [
+        (_Response(302, payload=_sync_payload("pools")), "backend_error", "HTTP 302"),
+        (
+            _Response(200, payload=_sync_payload("osds")),
+            "malformed_summary",
+            "requested resource 'pools'; got 'osds'",
+        ),
+    ],
+)
+def test_ceph_sync_job_rejects_invalid_http_evidence_before_merge(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+    http_client_module,
+    response: _Response,
+    expected_reason: str,
+    error_fragment: str,
+) -> None:
+    _, merge_calls = _configure_isolated_job(monkeypatch, jobs_module)
+    _wire_http_client_to_job(monkeypatch, jobs_module, http_client_module)
+    monkeypatch.setattr(
+        http_client_module.requests,
+        "get",
+        lambda *args, **kwargs: response,
+    )
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(RuntimeError, match="One or more Ceph sync stages failed"):
+        runner.run(resources=["pools"], cluster_pk=7)
+
+    assert runner.job.saved_data[-1] is runner.job.data
+    saved_response = runner.job.saved_data[-1]["ceph_sync"]["response"]
+    stage = saved_response["stages"][0]
+    assert stage["resource"] == "pools"
+    assert stage["status"] == "failed"
+    assert stage["reason"] == expected_reason
+    assert error_fragment in stage["error"]
+    assert saved_response["branch_disposition"] == {
+        "status": "left_open",
+        "branch_name": "ceph-sync-101",
+        "reason": "ceph_sync_stage_failed",
+    }
+    assert merge_calls == []
+
+
+@pytest.mark.parametrize("with_isolation", [False, True])
+def test_ceph_sync_job_non_json_200_is_malformed_and_never_merges(
+    monkeypatch: pytest.MonkeyPatch,
+    jobs_module,
+    http_client_module,
+    with_isolation: bool,
+) -> None:
+    merge_calls: list[object] = []
+    if with_isolation:
+        _, merge_calls = _configure_isolated_job(monkeypatch, jobs_module)
+    else:
+        monkeypatch.setattr(jobs_module, "branching_enabled_settings", lambda: None)
+    _wire_http_client_to_job(monkeypatch, jobs_module, http_client_module)
+    monkeypatch.setattr(
+        http_client_module.requests,
+        "get",
+        lambda *args, **kwargs: _Response(200, payload=ValueError("not json")),
+    )
+
+    runner = _job_runner(jobs_module)
+    with pytest.raises(RuntimeError, match="One or more Ceph sync stages failed"):
+        runner.run(resources=["pools"], cluster_pk=7)
+
+    assert runner.job.saved_data[-1] is runner.job.data
+    saved_response = runner.job.saved_data[-1]["ceph_sync"]["response"]
+    stage = saved_response["stages"][0]
+    assert stage["resource"] == "pools"
+    assert stage["status"] == "failed"
+    assert stage["reason"] == "malformed_summary"
+    assert "non-JSON body for ceph/sync/pools" in stage["error"]
+    if with_isolation:
+        assert saved_response["branch_disposition"] == {
+            "status": "left_open",
+            "branch_name": "ceph-sync-101",
+            "reason": "ceph_sync_stage_failed",
+        }
+    else:
+        assert "branch_disposition" not in saved_response
+    assert merge_calls == []
+
+
+@pytest.mark.parametrize(
+    ("payload", "field"),
+    [
+        ({}, "items"),
+        ({"items": "not-a-list"}, "items"),
+        ({"items": ["not-an-object"]}, "items[0]"),
+        (
+            {"items": [{**_summary_payload("pools"), "fetched": -1}]},
+            "items[0].fetched",
+        ),
+        (
+            {"items": [{**_summary_payload("pools"), "errors": "not-a-list"}]},
+            "items[0].errors",
+        ),
+    ],
+)
+def test_fetch_ceph_sync_rejects_malformed_summary_shape(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client_module,
+    payload: object,
+    field: str,
+) -> None:
+    monkeypatch.setattr(http_client_module, "_get_json", lambda *args, **kwargs: payload)
+
+    with pytest.raises(http_client_module.CephSyncPayloadError) as excinfo:
+        http_client_module.fetch_ceph_sync("pools")
+
+    assert excinfo.value.reason == "malformed_summary"
+    assert field in str(excinfo.value)
 
 
 @pytest.fixture

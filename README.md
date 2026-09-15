@@ -26,6 +26,19 @@ v1 reflection syncs are dispatched with `POST
 as `["pools", "osds"]`; omit it to run the default `full` sync. Queued runs are
 visible in NetBox's core Jobs UI.
 
+The proxbox-api sync contract returns HTTP 200. The client rejects non-2xx HTTP
+responses and validates every accepted body against proxbox-api's typed Ceph
+sync summary before the stage can succeed. Every summary must name the requested
+resource. A summary containing one or more upstream errors records the stage as
+`failed` with `reason="upstream_errors"`; a response that does not match the
+summary schema or body encoding, or that names another resource, records
+`reason="malformed_summary"`. The job completes the remaining selected resources
+so that mixed outcomes remain visible, then fails before branch merge. An
+isolated branch is left open and its job response records
+`branch_disposition.status="left_open"` with
+`reason="ceph_sync_stage_failed"` for operator inspection. Clean summaries
+retain the normal merge behavior.
+
 Desired-state configuration objects (`CephPoolDesiredState`,
 `CephFilesystemDesiredState`, `CephRBDImageDesiredState`,
 `CephRBDSnapshotDesiredState`, `CephRGWRealmDesiredState`,
