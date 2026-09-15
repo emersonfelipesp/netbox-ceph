@@ -193,6 +193,18 @@ opaque pointer only. Passwords, tokens, access keys, secret keys, and other
 credentials live in proxbox-api or its secret store. Payloads logged or stored
 through the v2 orchestrator path must pass through `redact_secrets()`.
 
+`CephProvider.credential_ref` is validated by the shared
+`netbox_ceph.validators.validate_credential_reference` in the model `clean()`,
+the form field, and the serializer field: bounded opaque pointer only,
+recognizable secret shapes rejected. It is write-only on the API (never
+returned), absent from the provider table, and rendered as a password input
+that keeps the stored value when submitted blank
+(`validators.keep_stored_reference`). No migration rewrites data; system check
+`netbox_ceph.W002` (a warning, so legacy rows never block startup) reports
+offending provider ids without their values. Recognized secret shapes are a
+tripwire only; an unknown shape within the pointer charset still passes. Any
+new field that holds a secret-store pointer must reuse the same validator.
+
 ## Ceph v1 Reflection Sync Dispatch
 
 `CephClusterViewSet.sync` exposes `POST

@@ -24,6 +24,18 @@ _ASSIGNMENT_PATTERN = re.compile(
 )
 _CAMEL_BOUNDARY_PATTERN = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _CREDENTIAL_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,254}$")
+_CREDENTIAL_MATERIAL_PATTERNS = (
+    re.compile(r"(?i)^https?://[^\s/@]+@"),
+    re.compile(r"^(?:AKIA|ASIA)[A-Z0-9]{16}$"),
+    re.compile(r"^gh(?:p|o|u|s|r)_[A-Za-z0-9]{20,}$"),
+    re.compile(r"^github_pat_[A-Za-z0-9_]{20,}$"),
+    re.compile(r"^eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$"),
+    re.compile(r"^(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{16,}$"),
+    re.compile(r"^sk-(?:(?:proj|svcacct)-)?[A-Za-z0-9_-]{16,}$"),
+    re.compile(r"^xox[abeprs]-[A-Za-z0-9-]{10,}$"),
+    re.compile(r"^glpat-[A-Za-z0-9_-]{20,}$"),
+    re.compile(r"^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64})$"),
+)
 _FORBIDDEN_SECRET_TOKENS = {"password", "passwd", "secret", "token", "credential"}
 _FORBIDDEN_FLAT_KEYS = {
     "apikey",
@@ -49,10 +61,15 @@ def _normalized_key_parts(key: object) -> tuple[str, tuple[str, ...]]:
     return "".join(parts), parts
 
 
-def _validate_credential_ref(value: object, *, path: str) -> None:
+def validate_credential_ref(value: object, *, path: str = "credential_ref") -> None:
+    """Require a bounded opaque pointer and reject recognizable secret values."""
     if value in (None, ""):
         return
-    if not isinstance(value, str) or not _CREDENTIAL_REF_PATTERN.fullmatch(value):
+    if (
+        not isinstance(value, str)
+        or not _CREDENTIAL_REF_PATTERN.fullmatch(value)
+        or any(pattern.search(value) for pattern in _CREDENTIAL_MATERIAL_PATTERNS)
+    ):
         raise SecretBearingIntentError(
             f"{path} must be an opaque credential reference, not credential material."
         )
@@ -71,7 +88,7 @@ def validate_secret_free_intent(payload: Any, *, path: str = "intent") -> None:
             flat_key, parts = _normalized_key_parts(key)
             child_path = f"{path}.{key}"
             if flat_key == "credentialref":
-                _validate_credential_ref(value, path=child_path)
+                validate_credential_ref(value, path=child_path)
                 continue
             if (
                 flat_key in _FORBIDDEN_FLAT_KEYS

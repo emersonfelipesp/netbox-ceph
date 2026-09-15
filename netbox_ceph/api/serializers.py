@@ -45,6 +45,7 @@ from netbox_ceph.services.redaction import (
     SecretBearingIntentError,
     validate_secret_free_intent,
 )
+from netbox_ceph.validators import validate_credential_reference
 
 
 class _SecretFreeIntentSerializerMixin:
@@ -582,6 +583,14 @@ class CephRBDCloneSerializer(NetBoxModelSerializer):
 
 
 class CephProviderSerializer(NetBoxModelSerializer):
+    credential_ref = serializers.CharField(
+        allow_blank=True,
+        max_length=255,
+        required=False,
+        trim_whitespace=False,
+        validators=(validate_credential_reference,),
+        write_only=True,
+    )
     url = serializers.HyperlinkedIdentityField(
         view_name="plugins-api:netbox_ceph-api:cephprovider-detail"
     )

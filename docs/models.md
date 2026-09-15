@@ -206,6 +206,30 @@ can plan, apply, or reconcile Ceph state. Stores connection metadata but
 **never stores credentials** — `credential_ref` is an opaque pointer to secrets
 held by proxbox-api.
 
+`credential_ref` is validated everywhere it can be written. The shared policy
+in `netbox_ceph.validators.validate_credential_reference` (backed by
+`services.redaction.validate_credential_ref`) accepts only a bounded opaque
+pointer — up to 255 characters from `A-Z a-z 0-9 . _ : / @ -`, starting with a
+letter or digit, no whitespace — and rejects recognizable credential material
+such as AWS access keys, GitHub and GitLab tokens, Slack tokens, JWTs, Stripe or
+OpenAI keys, bare 32/40/64-character hex digests, and URLs carrying
+`user:password@`. The shape list is a tripwire, not proof: an unrecognized
+secret that fits the pointer charset still passes, so the policy complements,
+rather than replaces, keeping secrets in the secret store. The rule is applied by `CephProvider.clean()`, by
+the `CephProviderForm` field, and by the `CephProviderSerializer` field.
+
+The reference is write-only on every surface: the API serializer never
+returns it, the provider table does not list it, and the form renders a
+password-style input that never shows the saved value. Leaving the form field
+blank keeps the stored reference; clearing it requires an explicit API write
+of an empty string.
+
+Existing rows are not rewritten. The Django system check
+`netbox_ceph.W002` (`netbox_ceph.checks.check_provider_credential_references`)
+reports, as a warning that never blocks `migrate` or startup, the ids of providers whose stored reference fails the policy so an
+operator can replace them; it never prints the stored value and stays silent
+until the plugin's tables exist.
+
 ### CephOperation
 
 Requested control-plane action. Stores the target kind, target reference,

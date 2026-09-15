@@ -38,6 +38,9 @@ else:
         def ready(self) -> None:
             super().ready()
             register_netbox_compatibility_check(self)
-            from . import jobs  # noqa: F401 — registers CephSyncJob via JobRunner metaclass
+            from . import (
+                checks,  # noqa: F401 — registers persisted security checks
+                jobs,  # noqa: F401 — registers CephSyncJob via JobRunner metaclass
+            )
 
     config = CephConfig

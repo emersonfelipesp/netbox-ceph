@@ -568,7 +568,6 @@ class CephProviderTable(NetBoxTable):
             "is_default",
             "base_url",
             "verify_ssl",
-            "credential_ref",
             "status",
             "status_detail",
             "last_checked_at",

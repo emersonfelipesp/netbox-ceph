@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -9,6 +10,7 @@ from netbox.models import NetBoxModel
 from utilities.json import CustomFieldJSONEncoder
 
 from netbox_ceph.choices import CephProviderKindChoices, CephProviderStatusChoices
+from netbox_ceph.validators import validate_credential_reference
 
 
 class CephProvider(NetBoxModel):
@@ -62,6 +64,15 @@ class CephProvider(NetBoxModel):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.kind})"
+
+    def clean(self) -> None:
+        """Reject secret material while preserving the migration field state."""
+
+        super().clean()
+        try:
+            validate_credential_reference(self.credential_ref)
+        except ValidationError as exc:
+            raise ValidationError({"credential_ref": exc}) from exc
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ceph:cephprovider", args=[self.pk])

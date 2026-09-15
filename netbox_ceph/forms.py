@@ -48,6 +48,7 @@ from netbox_ceph.models import (
     CephRGWZoneGroup,
     CephValidationResult,
 )
+from netbox_ceph.validators import keep_stored_reference, validate_credential_reference
 
 
 class CephPluginSettingsForm(NetBoxModelForm):
@@ -209,6 +210,26 @@ class CephRBDCloneFilterForm(_EndpointFilterMixin, NetBoxModelFilterSetForm):
 
 
 class CephProviderForm(NetBoxModelForm):
+    credential_ref = forms.CharField(
+        required=False,
+        max_length=255,
+        strip=False,
+        validators=(validate_credential_reference,),
+        widget=forms.PasswordInput(render_value=False),
+        help_text=_(
+            "Opaque secret-store reference. The saved value is never rendered or returned "
+            "by the API; leave blank to keep the current reference."
+        ),
+    )
+
+    def clean_credential_ref(self) -> str:
+        """Keep the stored reference when the never-rendered field is submitted blank."""
+
+        return keep_stored_reference(
+            self.cleaned_data.get("credential_ref"),
+            getattr(self.instance, "credential_ref", ""),
+        )
+
     class Meta:
         model = CephProvider
         fields = (
