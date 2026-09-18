@@ -20,6 +20,13 @@ between the approval response and the
 immediately following apply request; it is never stored, logged, serialized, or
 rendered by NetBox.
 
+The plugin is therefore not globally read-only. The v1 inventory remains
+read-only, while v2 can dispatch supported Proxmox mutations only when distinct
+object-scoped requester and approver permissions are satisfied, the canonical
+plan remains valid, endpoint/provider/node/configuration snapshots still match,
+and the backend writer contract and endpoint write authority are enabled.
+Installation and migrations never enable endpoint writes.
+
 v1 reflection syncs are dispatched with `POST
 /api/plugins/ceph/clusters/{id}/sync/`, which enqueues `CephSyncJob` with a
 7200-second timeout. Pass `resources` as a list or comma-separated string such

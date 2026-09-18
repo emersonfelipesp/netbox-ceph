@@ -19,7 +19,8 @@ The shared compatibility module is vendored byte-identically across
 
 | Plugin release | NetBox releases | Python | netbox-proxbox | proxbox-api |
 |---|---|---|---|---|
-| v0.0.1.post1 branch | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | Required; v2 plan/approve/apply needs the approval routes (see below) |
+| v0.0.1.post1 package | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | v1 reflection routes; the packaged release is read-only |
+| current v2 source | v4.5.8–v4.6.6 and official v4.7.0 GA | ≥3.12 | >=0.0.25.post2,<0.1.0 | >=0.0.23 for canonical plan, approval, apply, and recovery routes |
 
 Fail-closed branch isolation is guaranteed on every supported `netbox-proxbox`
 version. The typed branching decision contract is consumed automatically from
@@ -40,10 +41,9 @@ The v1 reflection sync (`/ceph/sync/*`) works against every published
 proxbox-api release that serves those routes. The v2 plan → approve → apply flow
 additionally needs `POST /ceph/v2/plans/{id}/approvals` and
 `GET /ceph/v2/approvals/{id}`, plus an apply route that accepts
-`approval_token`. Those routes exist on the backend `develop` branch from
-commit `4510af90`, which still carries the 0.0.22 version string; they ship in
-the first proxbox-api release cut after that commit (planned as 0.0.23). No
-published release up to and including 0.0.22 serves them. Against an older backend the plugin fails closed at
+`approval_token`. Those routes are pinned from backend commit `4510af90` and
+ship in `proxbox-api` 0.0.23. No published release up to and including 0.0.22
+serves them. Against an older backend the plugin fails closed at
 approval: the orchestrator translates the 404 into
 `CephOrchestratorUnsupported` and the operation is left unapproved with a
 named backend reason instead of a generic transport error.

@@ -1,5 +1,5 @@
 site_name: netbox-ceph
-site_description: NetBox plugin for read-only Proxmox Ceph inventory through netbox-proxbox / proxbox-api
+site_description: NetBox plugin for read-only Ceph inventory and controlled desired-state operations
 site_url: https://emersonfelipesp.github.io/netbox-ceph/
 repo_name: emersonfelipesp/netbox-ceph
 repo_url: https://github.com/emersonfelipesp/netbox-ceph

@@ -27,3 +27,7 @@ the operation fails as unsupported. The plugin never falls back to shell
 commands. The `proxbox-ceph-v2-2026-07` contract requires one typed,
 node-bound `ProviderOperation`; endpoint/provider/node/configuration snapshots
 must remain unchanged from plan through approval and apply.
+
+Writer support does not enable writes. proxbox-api must have its execution and
+trusted-gateway gates enabled, and the selected endpoint must explicitly allow
+writes. Neither repository enables those gates during installation or migration.

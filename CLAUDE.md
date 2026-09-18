@@ -113,8 +113,10 @@ Ceph v2 adds a separate NetBox control-plane foundation:
 - `CephDriftRecord` records desired-vs-actual comparison state.
 - `CephMetricSnapshot` records latest metric payloads by scope.
 
-Writable v2 objects are providers, operations, plans, validation results, and
-operation runs. Drift records and metric snapshots are read-only API/UI surfaces.
+Operator-writable v2 objects are providers, desired-state records, and operation
+requests. Plans, validation results, approvals, and operation runs are
+server-owned read-only audit surfaces; drift records and metric snapshots are
+also read-only API/UI surfaces.
 
 ## Ceph v2 Desired-State Configuration Objects
 
