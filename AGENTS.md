@@ -1,20 +1,8 @@
-# AGENTS.md — netbox-ceph — CLAUDE.md Mirror
-
-This file mirrors the sibling `CLAUDE.md` guidance for agents that read
-`AGENTS.md`. Treat `CLAUDE.md` as the source material; the content below
-preserves the current guide.
-
-## Source
-
-@CLAUDE.md
-
----
-
-# CLAUDE.md — netbox-ceph
+# AGENTS.md — netbox-ceph
 
 ## Workspace Context
 
-This file lives at `/root/personal-context/nmulticloud-context/netbox-ceph/CLAUDE.md` inside the `personal-context` workspace.
+This file lives at `/root/personal-context/nmulticloud-context/netbox-ceph/AGENTS.md` (`CLAUDE.md` imports it) inside the `personal-context` workspace.
 Workspace guidance: `/root/personal-context/CLAUDE.md`.
 Per-repo deep-dive: `/root/personal-context/claude-reference/nmulticloud-context.md`.
 Submodule layout and cross-repo links: `/root/personal-context/claude-reference/dependency-map.md`.
