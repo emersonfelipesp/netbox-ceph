@@ -25,7 +25,7 @@ def test_plugin_config_exposes_certification_metadata() -> None:
 
     assert config.version == "0.0.1.post1"
     assert config.min_version == "4.5.8"
-    assert config.max_version == "4.7.0"
+    assert config.max_version == "4.7.99"
     assert config.required_plugins == ["netbox_proxbox"]
     assert config.author_email == "emersonfelipe.2003@gmail.com"
 
@@ -108,7 +108,7 @@ def test_plugin_config_bounds_come_from_the_shared_compat_module() -> None:
 
     assert config.min_version == PLUGIN_MIN_VERSION == STABLE_MIN_NETBOX_VERSION
     assert config.max_version == PLUGIN_MAX_VERSION == STABLE_MAX_NETBOX_VERSION
-    assert STABLE_MAX_NETBOX_VERSION == "4.7.0"
+    assert STABLE_MAX_NETBOX_VERSION == "4.7.99"
 
 
 def test_packaging_is_a_declared_dependency() -> None:
