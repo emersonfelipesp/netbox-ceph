@@ -25,6 +25,21 @@ python manage.py collectstatic
 - Type checking: `pyright .`
 - Full test suite: `pytest tests/ -v`
 
+The Gitea quality workflow runs every pull request, pushes to `main` and
+`develop`, and every tag push, including tag names that contain slashes.
+Feature-branch pushes do not duplicate pull-request validation. The complete
+quality and package job, its authority source pin, and its checks remain the
+required pre-merge validation. The public quality workflow already limits
+branch pushes to `main` and `develop`. Deployment events are defined separately
+and are not changed by quality-workflow scheduling.
+
+`.nms-git-workflow.json` declares the supported local complete syntax, Ruff,
+format, strict documentation, and plain-pytest gates for this package. Use the
+normal `nms git workflow commit` and `push` commands with an owned compatible
+interpreter, an authenticated offline build supplier, and create-only gate
+workspaces. The complete hosted branch-coverage threshold and package-build
+checks remain required; the local plain-pytest profile does not replace them.
+
 ## Architecture
 
 See the plugin's code structure:

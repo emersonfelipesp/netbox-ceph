@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "syntax": [
+    {"kind": "python-compileall", "paths": ["netbox_ceph", "tests"]}
+  ],
+  "lint": [
+    {"kind": "ruff-check", "paths": ["netbox_ceph", "tests"]},
+    {"kind": "ruff-format-check", "paths": ["netbox_ceph", "tests"]},
+    {"kind": "mkdocs-strict", "paths": ["mkdocs.yml"]}
+  ],
+  "test": [
+    {"kind": "pytest-suite", "paths": ["tests"], "profile": "plain"}
+  ]
+}
